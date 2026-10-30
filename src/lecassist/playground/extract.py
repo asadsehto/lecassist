@@ -11,7 +11,7 @@ class Assignment(BaseModel):
 
 pprint.pprint(Assignment.model_json_schema())
 messages = []
-date = datetime.now().date()
+date = datetime.now().strftime("%Y-%m-%d")
 M = "gemma4:e2b-it-qat"
 
 
@@ -21,7 +21,7 @@ def chat_with_assistant(system_prompt: str = f"You extract details from assignme
      text = input("Enter your message (or type 'exit' to quit): ")
      if text.lower() == 'exit':
         break
-     print("Continuing...")
+     print("Model Responding...")
      messages.append({"role": "User", "content": text})
      response = chat(format = Assignment.model_json_schema(), model = M, messages  = messages, 
      think = False
