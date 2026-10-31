@@ -6,7 +6,7 @@ def list_movies()-> list:
     """
     return ["Movie 1", "Movie 2", "Movie 3"]
 
-def list_assingments(course_name: str) -> list:
+def list_assignments(course_name: str) -> list:
     """
     returns the list of assignments for a given course 
 
@@ -28,7 +28,7 @@ m = "gemma4:e2b-it-qat"
 syspromp = "You are a helpful assistant to a teacher" \
 " who uses tools to get tasks done or answer questions"
 tools = {"list_courses": list_courses, "list_movies": list_movies,
-          "list_assingments":list_assingments}
+          "list_assignments":list_assignments}
 
 def chat_with_assistant_with_tools(sys_prompt:str = syspromp, model: str = m):
     messages = []
@@ -40,33 +40,37 @@ def chat_with_assistant_with_tools(sys_prompt:str = syspromp, model: str = m):
                 break
          
          else:
-             messages.append({"role": "user", "content": text})    
+             messages.append({"role": "user", "content": text})  
              response = chat(model, messages  = messages,
-                        tools= [list_movies, list_assingments, list_courses],
-                        think = False)
-             
-             print("Model Response: " , response.message.content, "Model tool calls: " ,
-             response.message.tool_calls)
+                                     tools= [list_movies, list_assignments, list_courses],
+                                     think = False)  
+             while True:
+                if(response.message.tool_calls is  None):
+                       break
+                else:
+                  print("Model Response: " , response.message.content, "Model tool calls: " ,
+                  response.message.tool_calls)
 
-             if(response.message.tool_calls is None):
-                messages.append(response.message)
-                print("model: ", response.message.content)
-
-             else:
-               messages.append(response.message)
-               for call in response.message.tool_calls:
-                f_name = call.function.name
-                Args = call.function.arguments
-                function= tools[f_name]
-                res = function(**Args)
-                messages.append({"role": "tool", "tool_name" : f_name, "content":json.dumps(res) })
-             response = chat(model, messages  = messages,
-                      tools= [list_movies, list_assingments, list_courses],
-                     think = False)
+                  if(response.message.tool_calls is None):
+                     messages.append(response.message)
+                     print("model: ", response.message.content)
+  
+                  else:
+                    messages.append(response.message)
+                    for call in response.message.tool_calls:
+                     f_name = call.function.name
+                     Args = call.function.arguments
+                     function= tools[f_name]
+                     res = function(**Args)
+                     messages.append({"role": "tool", "tool_name" : f_name, "content":json.dumps(res) })
+                  response = chat(model, messages  = messages,
+                        tools= [list_movies, list_assignments, list_courses],
+                       think = False)
 
              print(response.message.content)
              messages.append(response.message)
 
-    
-chat_with_assistant_with_tools()  
+if __name__ == "__main__":
+    chat_with_assistant_with_tools()   
+ 
      
