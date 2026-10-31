@@ -1,5 +1,7 @@
-from lecassist.Moodle import call_moodle
+from lecassist.Moodle import call_moodle, find_course, find_week
+import pprint
 
-res = call_moodle("core_enrol_get_users_courses" , userid = 3)
-for r in res:
-    print( r["shortname"] ,  r["fullname"])
+print(find_course("ai101"))
+print(find_course("PHY999") )
+print(find_week(2, 3)) 
+print(find_week(2, 20))
