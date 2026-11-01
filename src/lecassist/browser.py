@@ -58,3 +58,18 @@ def upload_material(page, course_id: int, section: int, name: str, file_path: st
             errors = page.locator(".invalid-feedback:visible").all_inner_texts()
             raise RuntimeError("not saved: " + " | ".join(errors))
     print("saved, now at", page.url)
+
+def create_course(page, fullname: str, shortname: str , weeks:int=14):
+     page.goto(f"http://localhost:8000/course/edit.php?category=1")
+     page.locator("#id_fullname").fill(fullname)
+     page.locator("#id_shortname").fill(shortname)
+     page.locator("#id_courseformathdr .fheader").click()
+     page.locator("#id_numsections").select_option(str(weeks))
+     page.locator("#id_saveanddisplay").click()
+     if "course/edit.php" in page.url:
+        errors = page.locator(".invalid-feedback:visible").all_inner_texts()
+        raise RuntimeError("not saved: " + " | ".join(errors))
+     print("saved, now at", page.url)
+
+
+    
