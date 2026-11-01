@@ -1,9 +1,7 @@
 faster-whisper
-faster-whisper
 av<19
 pyannote.audio>=3.1,<4
 noisereduce
 jiwer
 soundfile
 numpy
-diarize
