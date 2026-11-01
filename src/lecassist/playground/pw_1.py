@@ -4,6 +4,7 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 from lecassist.browser import login, create_assignment
 from lecassist.Moodle import call_moodle
+from lecassist.browser import login, create_assignment, upload_material
 import os
 import time
 username = os.environ["MOODLE_USER"]
@@ -16,7 +17,7 @@ with sync_playwright() as p:
                                 , slow_mo = 1000)
     page = browser.new_page()
     login(page ,username , password)
-    create_assignment(page, 2, 3, "My Lab 3", datetime(2026, 11, 6, 23, 59), pdf)
+    upload_material(page, 2, 3, "Week 3 slides", pdf)
     browser.close()
     browser.close()
 

@@ -27,6 +27,7 @@ def set_date(page, field: str, when):
 def attach_file(page, path: str):
     page.locator(".filemanager .fp-btn-add").first.click()
     page.get_by_text("Upload a file").click()
+    page.wait_for_timeout(1000)
     page.locator("input[name=repo_upload_file]").set_input_files(path)
     page.get_by_role("button", name="Upload this file").click()
     page.locator(".filemanager .fp-file").first.wait_for()
@@ -44,4 +45,16 @@ def create_assignment(page, course_id: int, section: int, name: str, due, pdf_pa
     if "modedit.php" in page.url:
         errors = page.locator(".invalid-feedback:visible").all_inner_texts()
         raise RuntimeError("not saved: " + " | ".join(errors))
+    print("saved, now at", page.url)
+
+def upload_material(page, course_id: int, section: int, name: str, file_path: str):
+    page.goto(f"{URL}/course/modedit.php?add=resource&course={course_id}&section={section}")
+    page.locator("#id_name").fill(name)
+    if file_path:
+         attach_file(page, file_path)
+    page.locator("#id_submitbutton2").click()
+    page.wait_for_load_state()
+    if "modedit.php" in page.url:
+            errors = page.locator(".invalid-feedback:visible").all_inner_texts()
+            raise RuntimeError("not saved: " + " | ".join(errors))
     print("saved, now at", page.url)
