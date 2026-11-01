@@ -14,11 +14,11 @@ def call_moodle(function:str , **params)-> dict:
            raise RuntimeError(function + ": " + data["message"])
         return data
 
-def find_course(userid:str):
+def find_course(shortname:str):
       me = call_moodle("core_webservice_get_site_info")
       res = call_moodle("core_enrol_get_users_courses", userid=me["userid"])
       for r in res:
-        if(r["shortname"].lower()==userid.lower()):
+        if(r["shortname"].lower()==shortname.lower()):
              return {"id":r["id"], "shortname":r["shortname"],
                        "fullname": r["fullname"]}
       return None      
