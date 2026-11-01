@@ -18,7 +18,6 @@ with sync_playwright() as p:
                                 , slow_mo = 1000)
     page = browser.new_page()
     login(page ,username , password)
-    #create_course(page , "Deep Learning" , "DL101")
     browser.close()
 
 course = find_course("DL101")

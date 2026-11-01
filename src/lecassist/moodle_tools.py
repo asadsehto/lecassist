@@ -23,6 +23,11 @@ def add_assignment(course: str, week: int, name: str, due: str, pdf_path: str = 
     w = find_week(c["id"], week)
     if w is None:
         return {"error": "course " + course + " has no week " + str(week)}
+    action = "create assignment '" + name + "' in " + c["shortname"] + " " + w["name"] + ", due " + due
+    if pdf_path:
+        action = action + ", attach " + pdf_path
+    if not approve(action):
+        return {"cancelled": "the teacher did not approve this"}
     try:
         due_date = datetime.strptime(due, "%Y-%m-%d %H:%M")
         with sync_playwright() as p:
@@ -43,6 +48,8 @@ def add_course(fullname: str, shortname: str, weeks: int = 14) -> dict:
         shortname: unique short name, for example ML301
         weeks: number of weeks, 14 if not given
     """
+    if not approve("create course '" + fullname + "' (" + shortname + ") with " + str(weeks) + " weeks"):
+        return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -69,6 +76,8 @@ def add_material(course: str, week: int, name: str, file_path: str) -> dict:
     w = find_week(c["id"], week)
     if w is None:
         return {"error": "course " + course + " has no week " + str(week)}
+    if not approve("upload " + file_path + " as '" + name + "' to " + c["shortname"] + " " + w["name"]):
+        return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -79,3 +88,8 @@ def add_material(course: str, week: int, name: str, file_path: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
     return {"done": "material uploaded", "course": c["shortname"], "week": week, "name": name}
+
+def approve(action: str) -> bool:
+    print("About to:", action)
+    answer = input("Approve? (yes/no): ")
+    return answer.strip().lower() == "yes"
