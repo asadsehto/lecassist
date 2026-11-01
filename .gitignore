@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+src/lecassist/audio/data/raw/
+src/lecassist/audio/data/clean/

@@ -1,0 +1,47 @@
+[00:00:00] SPEAKER_00: یجتی bit to find yk30102yM
+[00:00:19] SPEAKER_00: اور اگر ایسا نہیں ہوں ایک سیل is a blank تو ایر آل آل ہا ہے ہمارے پاس production rule کے لئے جو
+[00:00:26] SPEAKER_00: ایر آل ہا ہے تو ایر آل ہا ہے to ایر آل ٹا آل ٹا اسیل کو سکا سکتا دیں گی ، ایر آل ٹا سکا دائی ۔
+[00:00:36] SPEAKER_00: terminele on top is not equal to the input signal
+[00:00:40] SPEAKER_00: جو input پہ آیا ہے وہ different type is verschادturning
+[00:00:46] SPEAKER_00: پروگرام جو میچ کرنا چاہ رہا ہے وہ میچ ہی نہیں ہو رہا ہے
+[00:00:50] SPEAKER_00: that's also an error
+[00:00:53] SPEAKER_00: that's also an error
+[00:00:54] SPEAKER_00: کررہ کی دو possibility ہو رہے ہیں
+[00:00:56] SPEAKER_00: نمبر وار
+[00:00:57] SPEAKER_00: terminal کی ایک پروڈکیاں دول لہی ہیں
+[00:00:59] SPEAKER_00: نمبر ٹو
+[00:01:00] SPEAKER_00: terminal ہو جیود ہے
+[00:01:03] SPEAKER_00: stack to be data ہو جیود ہے لیکن دونوں میچ نہیں کر رہے ہیں
+[00:01:06] SPEAKER_00: دونوں میچ کر رہے ہیں
+[00:01:08] SPEAKER_00: پروشید کر رہے ہیں
+[00:01:10] SPEAKER_00: دونوں میچ کرتے کرتے end ہو گئے
+[00:01:12] SPEAKER_00: stopped
+[00:01:12] SPEAKER_00: اور valid
+[00:01:13] SPEAKER_00: یہ چار possibility ہوں
+[00:01:16] SPEAKER_00: میں ویڈر دیتا ہوں
+[00:01:18] SPEAKER_00: ویڈر کرتے کرتے
+[00:01:19] SPEAKER_00: نمبر ختم ہو گیا ڈالر آ گیا
+[00:01:21] SPEAKER_00: stack خالی ہو گیا ڈالر آ گیا
+[00:01:23] SPEAKER_00: کیا کہیں گے
+[00:01:26] SPEAKER_00: valid statement
+[00:01:28] SPEAKER_00: آپ کے پاس
+[00:01:29] SPEAKER_00: input کے جو symbol
+[00:01:31] SPEAKER_00: terminal ہے اس کے لئے آپ کے پاس
+[00:01:33] SPEAKER_00: m
+[00:01:35] SPEAKER_00: ویڈر ٹیبل ہے
+[00:01:36] SPEAKER_00: اس کے اندر پروڈکشن رون لیں گے
+[00:01:40] SPEAKER_00: اگر
+[00:01:41] SPEAKER_00: اور
+[00:01:41] SPEAKER_00: terminal کے لئے آپ کے پاس
+[00:01:43] SPEAKER_00: input ہے
+[00:01:43] SPEAKER_00: اور
+[00:01:44] SPEAKER_00: match ہو رہا ہے
+[00:01:44] SPEAKER_00: match ہو رہا ہے
+[00:01:45] SPEAKER_00: اگر بڑھ جائیں
+[00:01:46] SPEAKER_00: match کریں
+[00:01:46] SPEAKER_00: اگر بڑھ جائیں
+[00:01:48] SPEAKER_00: match کریں
+[00:01:48] SPEAKER_00: اور
+[00:01:50] SPEAKER_00: terminal
+[00:01:51] SPEAKER_00: ملید
+[00:01:51] SPEAKER_00: ملید
