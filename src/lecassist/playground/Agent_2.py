@@ -8,7 +8,6 @@ m = "gemma4:e2b-it-qat"
 today = datetime.now().strftime("%A %Y-%m-%d")
 syspromp = "You are a helpful assistant to a teacher who uses tools to get tasks done on Moodle. Today is " + today + "."
 tools = {"add_assignment": add_assignment, "add_material": add_material, "add_course": add_course}
-print(tools.keys())
 def chat_with_agent(system_prompt:str= syspromp, model:str=m):
     messages=[]
     messages.append({"role":"system", "content" : system_prompt})
@@ -49,8 +48,3 @@ def chat_with_agent(system_prompt:str= syspromp, model:str=m):
               messages.append(r.message)
 
 chat_with_agent()
-                   
-             
-       
-
-

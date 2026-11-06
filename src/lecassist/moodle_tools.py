@@ -52,7 +52,7 @@ def add_course(fullname: str, shortname: str, weeks: int = 14) -> dict:
         return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=False)
             page = browser.new_page()
             login(page, username, password)
             create_course(page, fullname, shortname, weeks)
@@ -80,7 +80,7 @@ def add_material(course: str, week: int, name: str, file_path: str) -> dict:
         return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=False)
             page = browser.new_page()
             login(page, username, password)
             upload_material(page, c["id"], w["section"], name, file_path)

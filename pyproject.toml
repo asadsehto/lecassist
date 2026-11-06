@@ -1,7 +1,7 @@
 [project]
 name = "lecassist"
 version = "0.1.0"
-description = "Add your description here"
+description = "LecAssist: AI agents for recording, summarising and managing university lectures"
 readme = "README.md"
 authors = [
     { name = "asad saleem", email = "156583018+asadsehto@users.noreply.github.com" }
