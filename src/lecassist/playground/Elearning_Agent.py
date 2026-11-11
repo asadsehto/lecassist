@@ -16,7 +16,8 @@ def make_prompt(course: str = "", files: list = []) -> str:
     syspromp = ("You are a helpful assistant to a teacher who uses tools to get tasks done on Moodle. "
                 "Today is " + today.strftime("%A %Y-%m-%d") + ". The next days are: " + days + ". "
                 "Write due dates as YYYY-MM-DD HH:MM. "
-                "If something the tool needs is missing, ask the teacher one short question.")
+                "If something the tool needs is missing, ask the teacher one short question. "
+                "If a tool returns cancelled, nothing was done: tell the teacher it was not done.")
     if course:
         syspromp += " The teacher selected the course " + course + ". Use it unless they name another course."
     if files:

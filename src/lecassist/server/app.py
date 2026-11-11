@@ -187,6 +187,11 @@ lectures: list[dict] = []       # recorded lectures, newest first (kept while th
 current = threading.local()     # which job the current thread belongs to
 
 
+class ChangeRequested(BaseException):
+    """The teacher pressed Change: stop the agent so they can say what to fix.
+    BaseException, so the agent loop's `except Exception` does not swallow it."""
+
+
 def app_approve(action: str) -> bool:
     """Replaces moodle_tools.approve: ask in the app instead of input()."""
     job = current.job
@@ -196,9 +201,16 @@ def app_approve(action: str) -> bool:
     job["event"].clear()
     job["event"].wait(timeout=1800)
     yes = job["answer"] is True
-    job["approvals"].append({"action": action, "approved": yes})
+    change = job["answer"] == "change"
+    job["approvals"].append({"action": action, "approved": yes, "change": change})
     job["question"] = None
+    if change:
+        raise ChangeRequested(action)
     return yes
+
+
+def changed(e: ChangeRequested) -> str:
+    return "Nothing was done. What should I change about: " + str(e) + "?"
 
 
 moodle_tools.approve = app_approve
@@ -217,6 +229,9 @@ def start_job(work, *args) -> dict:
         except Exception as e:
             job["error"] = str(e)
             job["state"] = "error"
+        except ChangeRequested as e:
+            job["result"] = changed(e)
+            job["state"] = "done"
 
     threading.Thread(target=target, daemon=True).start()
     return job
@@ -235,6 +250,7 @@ def get_job(job_id: str):
 
 class AnswerIn(BaseModel):
     approve: bool
+    change: bool = False
 
 
 @app.post("/api/jobs/{job_id}/answer")
@@ -243,7 +259,7 @@ def answer_job(job_id: str, body: AnswerIn):
     job = jobs.get(job_id)
     if job is None or job["question"] is None:
         raise HTTPException(404, "Nothing is waiting for an answer")
-    job["answer"] = body.approve
+    job["answer"] = "change" if body.change else body.approve
     job["event"].set()
     return {"ok": True}
 
@@ -298,49 +314,132 @@ def agent_ask(body: AskIn):
     course = course_name(body.course_id) if body.task != "course" else ""
 
     def work(job):
-        return Elearning_Agent.run_agent([m.model_dump() for m in body.messages],
-                                         TASK_TOOLS[body.task], course, files)
+        try:
+            return Elearning_Agent.run_agent([m.model_dump() for m in body.messages],
+                                             TASK_TOOLS[body.task], course, files)
+        except ChangeRequested as e:
+            return changed(e)
 
     return job_view(start_job(work))
 
 
 # ---------- Record (lectures) ----------
+# Each lecture is a conversation with the eLearning agent: the first turn is the
+# summary task, later turns are the teacher's replies or an edited summary.
+
+def lecture_turn(lecture: dict, text: str | None = None, new_summary: bool = False):
+    def work(job):
+        if not lecture["summary"]:
+            from lecassist.audio.translate import transcribe_english
+            job["stage"] = "Transcribing"
+            lecture["transcript"] = transcribe_english(lecture["audio"])
+            job["stage"] = "Summarising"
+            lecture["summary"] = Summary_Agent.summarize(lecture["transcript"])
+            new = True
+        else:
+            new = new_summary
+        if new:
+            lecture["messages"] = [{"role": "user", "content": Summary_Agent.lecture_task(
+                lecture["summary"], lecture["course"], lecture["week"], lecture["paths"])}]
+        else:
+            if lecture["paths"]:
+                text_with_files = text + "\n(Attached files: " + ", ".join(lecture["paths"]) + ")"
+            else:
+                text_with_files = text
+            lecture["messages"].append({"role": "user", "content": text_with_files})
+        job["stage"] = "Checking what eLearning needs"
+        try:
+            reply = Elearning_Agent.run_agent(lecture["messages"], ["add_assignment", "add_material"],
+                                              lecture["course"], lecture["paths"])
+        except ChangeRequested as e:
+            reply = changed(e)
+        lecture["messages"].append({"role": "assistant", "content": reply})
+        return reply
+
+    job = start_job(work)
+    lecture["turns"].append({"text": text or ("Summary edited" if new_summary else None), "job": job["id"]})
+
+
+def lecture_view(lecture: dict) -> dict:
+    return {k: lecture[k] for k in ("id", "course", "week", "recorded", "files", "transcript", "summary")} | {
+        "turns": [{"text": t["text"], "job": job_view(jobs[t["job"]])} for t in lecture["turns"] if t["job"] in jobs]}
+
+
+def find_lecture(lecture_id: str) -> dict:
+    lecture = next((x for x in lectures if x["id"] == lecture_id), None)
+    if lecture is None:
+        raise HTTPException(404, "No such lecture")
+    if any(jobs[t["job"]]["state"] == "working" for t in lecture["turns"] if t["job"] in jobs):
+        raise HTTPException(409, "LecAssist is still working on this lecture. Answer its question first.")
+    return lecture
+
+
+def add_files(lecture: dict, file_ids: list[str]):
+    for i in file_ids:
+        if i in uploads and uploads[i]["path"] not in lecture["paths"]:
+            lecture["paths"].append(uploads[i]["path"])
+            lecture["files"].append(uploads[i]["name"])
+
 
 @app.post("/api/lectures")
 def new_lecture(audio: UploadFile = File(...), course_id: int = Form(...), week: int = Form(...),
                 file_ids: str = Form("")):
-    """Recorded audio -> English transcript -> summary -> Summary_Agent asks to do what is needed."""
+    """Recorded audio -> English transcript -> summary -> the eLearning agent asks to do what is needed."""
+    course = course_name(course_id)
+    if not course:
+        raise HTTPException(400, "Choose one of your courses")
     folder = UPLOAD_DIR / uuid.uuid4().hex
     folder.mkdir()
     audio_path = folder / (Path(audio.filename or "lecture.webm").name)
     audio_path.write_bytes(audio.file.read())
-    files = [uploads[i]["path"] for i in file_ids.split(",") if i in uploads]
-    course = course_name(course_id)
-    if not course:
-        raise HTTPException(400, "Choose one of your courses")
-    lecture = {"id": uuid.uuid4().hex, "course": course, "week": week,
+    lecture = {"id": uuid.uuid4().hex, "course": course, "week": week, "audio": str(audio_path),
                "recorded": datetime.now().strftime("%a %d %b %Y, %H:%M"),
-               "files": [Path(f).name for f in files], "transcript": "", "summary": "", "job": None}
+               "files": [], "paths": [], "transcript": "", "summary": "", "messages": [], "turns": []}
+    add_files(lecture, [i for i in file_ids.split(",") if i])
     lectures.insert(0, lecture)
+    lecture_turn(lecture)
+    return lecture_view(lecture)
 
-    def work(job):
-        from lecassist.audio.translate import transcribe_english
-        job["stage"] = "Transcribing"
-        lecture["transcript"] = transcribe_english(str(audio_path))
-        job["stage"] = "Summarising"
-        lecture["summary"] = Summary_Agent.summarize(lecture["transcript"])
-        job["stage"] = "Checking what eLearning needs"
-        return Summary_Agent.act_on_summary(lecture["summary"], course, week, files)
 
-    job = start_job(work)
-    lecture["job"] = job["id"]
-    return {"lecture": lecture, "job": job_view(job)}
+class ReplyIn(BaseModel):
+    text: str = Field(min_length=1)
+    file_ids: list[str] = []
+
+
+@app.post("/api/lectures/{lecture_id}/reply")
+def reply_lecture(lecture_id: str, body: ReplyIn):
+    """Answer the agent's question or ask for a change; attached files are added to the lecture."""
+    lecture = find_lecture(lecture_id)
+    add_files(lecture, body.file_ids)
+    lecture_turn(lecture, body.text.strip())
+    return lecture_view(lecture)
+
+
+class SummaryIn(BaseModel):
+    summary: str = Field(min_length=1)
+
+
+@app.post("/api/lectures/{lecture_id}/summary")
+def edit_summary(lecture_id: str, body: SummaryIn):
+    """Save the teacher's edited summary and let the agent check it again from the start."""
+    lecture = find_lecture(lecture_id)
+    lecture["summary"] = body.summary.strip()
+    lecture_turn(lecture, new_summary=True)
+    return lecture_view(lecture)
 
 
 @app.get("/api/lectures")
 def get_lectures():
-    """Recorded lectures with their summaries and the state of their actions."""
-    return [{**lec, "job": job_view(jobs[lec["job"]]) if lec["job"] in jobs else None} for lec in lectures]
+    """Recorded lectures with their summaries and every agent turn."""
+    return [lecture_view(lec) for lec in lectures]
+
+
+@app.get("/api/lectures/{lecture_id}")
+def get_lecture(lecture_id: str):
+    lecture = next((x for x in lectures if x["id"] == lecture_id), None)
+    if lecture is None:
+        raise HTTPException(404, "No such lecture")
+    return lecture_view(lecture)
 
 
 # The simple teacher forms. A different UI can ignore this and call /api directly.

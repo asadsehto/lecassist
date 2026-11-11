@@ -87,6 +87,7 @@
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body {
   margin: 0;
+  overflow: hidden;
   background: var(--color-bg-app);
   color: var(--color-text);
   font: 0.875rem/1.5 var(--font);
@@ -108,6 +109,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   height: 100dvh;
+  overflow: hidden;  /* an app window: only the content areas scroll */
 }
 
 .sidebar {
@@ -355,6 +357,22 @@ label > .hint:last-child { display: block; margin-top: 4px; }
   margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--color-bg-sunken);
   font: inherit; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+.summary-box { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.summary-box .summary { width: 100%; }
+.summary-editor { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.summary-edit {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--color-border-input); border-radius: 8px;
+  background: var(--color-bg-surface); line-height: 1.5; resize: vertical;
+}
+.turns { display: flex; flex-direction: column; gap: 8px; }
+.turns .msg.user { display: flex; justify-content: flex-end; }
+.lecture-reply textarea {
+  flex: 1; min-width: 0; min-height: 36px; padding: 7px 4px; border: 0; outline: 0; background: none; resize: none;
+}
+.lecture-reply .attach { border-color: transparent; background: none; color: var(--color-text-secondary); }
+.lecture-reply .attach:focus-within { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.lecture-reply:focus-within { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.approval-actions .btn { flex: none; }
 .transcript summary { cursor: pointer; color: var(--color-accent-text); font-weight: 500; }
 .transcript p { margin-top: 8px; color: var(--color-text-secondary); text-wrap: pretty; }
 .agent-turn { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }

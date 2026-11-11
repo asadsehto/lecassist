@@ -4,7 +4,7 @@ The LecAssist teacher app. Sidebar:
 
 - **Record lecture**: choose the course and week, record (pause and resume work) or upload a recording, and optionally add the slides. LecAssist writes an English transcript and a summary, then asks you to approve what eLearning needs, such as an assignment you announced or uploading the slides.
 - **eLearning**
-  - **From lectures**: every recorded lecture with its summary, transcript and the actions waiting for your approval.
+  - **From lectures**: every recorded lecture with its summary (Edit summary reruns the check), transcript, the actions waiting for approval (Approve, Change, Decline) and a reply box to answer LecAssist or attach slides.
   - **Ask**: pick a task (create assignment, upload material, create course), optionally choose the course, type the request and approve what the agent wants to do. Each task keeps its own chat.
   - **Fill a form**: the same three tasks with every field.
 - **Coming next**: marks, Telegram and WhatsApp, semester search, quizzes ("Coming soon" pages).
@@ -47,14 +47,16 @@ An agent runs as a **job**. Poll `GET /api/jobs/{id}`:
 ```
 
 - `state` is `working`, `done` or `error`. `result` is the agent's last answer.
-- When `question` is set, the agent is waiting. Answer with `POST /api/jobs/{id}/answer` and `{"approve": true}` or `false`.
+- When `question` is set, the agent is waiting. Answer with `POST /api/jobs/{id}/answer` and `{"approve": true}` or `false`. `{"approve": false, "change": true}` stops the agent ("Nothing was done. What should I change…?") so the teacher can reply with the fix.
 - `approvals` lists every question already answered.
 
 | Method | Path | Body | Starts |
 |---|---|---|---|
 | POST | `/api/uploads` | multipart `files` (repeat) | returns `[{"id", "name"}]` |
-| POST | `/api/lectures` | multipart `audio`, `course_id`, `week`, `file_ids` (comma separated) | transcribe, summarise, act; returns `{"lecture", "job"}` |
-| GET | `/api/lectures` | | lectures with summary, transcript and job |
+| POST | `/api/lectures` | multipart `audio`, `course_id`, `week`, `file_ids` (comma separated) | transcribe, summarise, act; returns the lecture with its first turn |
+| GET | `/api/lectures`, `/api/lectures/{id}` | | lectures with summary, transcript and every agent turn |
+| POST | `/api/lectures/{id}/reply` | JSON `{"text", "file_ids"}` | answer the agent or ask for a change; files are added to the lecture |
+| POST | `/api/lectures/{id}/summary` | JSON `{"summary"}` | save an edited summary; the agent checks it again from the start |
 | POST | `/api/agent/ask` | JSON `{"messages": [{"role", "content"}], "task": "assignment", "course_id": 14, "file_ids": []}` | Elearning_Agent; returns the job |
 | GET | `/api/status` | | `{"moodle", "model", "model_ok"}` |
 | GET | `/api/courses`, `/api/courses/{id}/weeks`, `/api/categories` | | lists for dropdowns |

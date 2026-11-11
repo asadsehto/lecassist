@@ -144,7 +144,7 @@ async function loadStatus() {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const plain = text => (text || "").replace(/\*\*/g, "");  // the model writes **bold**
 
-async function followJob(jobId, box, onDone) {
+async function followJob(jobId, box, onDone, onChange) {
   let shownQuestion = null;
   let shownApprovals = 0;
   const status = el("p", { class: "job-status" });
@@ -161,11 +161,11 @@ async function followJob(jobId, box, onDone) {
       const a = job.approvals[shownApprovals++];
       box.querySelector(".approval.open")?.remove();
       box.insertBefore(el("div", { class: "approval " + (a.approved ? "ok" : "muted") },
-        icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : "Declined: ") + a.action)), status);
+        icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : a.change ? "To change: " : "Declined: ") + a.action)), status);
     }
     if (job.question && job.question !== shownQuestion) {
       shownQuestion = job.question;
-      box.insertBefore(approvalCard(jobId, job.question), status);
+      box.insertBefore(approvalCard(jobId, job.question, onChange), status);
       scrollDown();
     }
     if (!job.question) shownQuestion = null;
@@ -180,21 +180,27 @@ async function followJob(jobId, box, onDone) {
   }
 }
 
-function approvalCard(jobId, question) {
+function approvalCard(jobId, question, onChange) {
   const yes = el("button", { type: "button", class: "btn btn-primary" }, "Approve");
+  const change = el("button", { type: "button", class: "btn" }, icon("form"), "Change");
   const no = el("button", { type: "button", class: "btn" }, "Decline");
   const card = el("div", { class: "approval open", role: "group", "aria-label": "Needs your approval" },
     el("p", { class: "approval-title" }, icon("alert"), "Needs your approval"),
     el("p", { class: "approval-text" }, question),
-    el("div", { class: "approval-actions" }, no, yes));
-  const answer = async approve => {
-    yes.disabled = no.disabled = true;
+    el("p", { class: "hint" }, "Change declines this, then you tell LecAssist what to fix in the reply box."),
+    el("div", { class: "approval-actions" }, no, change, yes));
+  change.addEventListener("click", async () => {
+    await answer(false, true);
+    onChange?.();
+  });
+  const answer = async (approve, change = false) => {
+    yes.disabled = no.disabled = change.disabled = true;
     try {
       await api(`/api/jobs/${jobId}/answer`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve, change }),
       });
     } catch (err) {
-      yes.disabled = no.disabled = false;
+      yes.disabled = no.disabled = change.disabled = false;
       card.append(el("p", { class: "field-error" }, icon("alert"), err.message));
     }
   };
@@ -339,6 +345,9 @@ $("#composer").addEventListener("submit", async e => {
       box.append(el("div", { class: "bubble" }, plain(reply) || "Done."));
       if (task === "course" && done.approvals.some(a => a.approved)) loadCourses();
       scrollDown();
+    }, () => {
+      promptBox.placeholder = "Tell LecAssist what to change, e.g. due 20 Nov at 5 pm";
+      promptBox.focus();
     });
   } catch (err) {
     conversation.pop();
@@ -441,53 +450,138 @@ async function sendLecture(audio) {
     data.append("file_ids", (await uploadFiles(lectureFiles)).join(","));
     lectureFiles = [];
     renderLectureFiles();
-    const res = await api("/api/lectures", { method: "POST", body: data });
-    renderLecture(res.lecture, $("#record-results"), true);
+    const lec = await api("/api/lectures", { method: "POST", body: data });
+    $("#record-results").prepend(renderLecture(lec));
   } catch (err) {
     $("#record-results").prepend(el("div", { class: "notice err" }, icon("alert"), "Not sent: " + err.message));
   }
 }
 
-// One lecture: summary, then the agent's approvals and what it did.
-const following = new Set();
-function renderLecture(lec, into, atTop) {
-  const summary = el("pre", { class: "summary" }, lec.summary || "");
-  const agentBox = el("div", { class: "agent-turn" });
+// One lecture: editable summary, transcript, then the conversation with the agent
+// (its approvals and answers) and a box to reply, attach files or ask for a change.
+function approvalsList(job) {
+  return job.approvals.map(a => el("div", { class: "approval " + (a.approved ? "ok" : "muted") },
+    icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : a.change ? "To change: " : "Declined: ") + a.action)));
+}
+
+function renderLecture(lec) {
+  const card = el("article", { class: "lecture", "data-lecture": lec.id });
+  const busyNow = lec.turns.some(t => t.job.state === "working");
+
+  // summary, with Edit
+  const summaryText = el("pre", { class: "summary" }, lec.summary || "");
+  summaryText.hidden = !lec.summary;
+  const editBtn = el("button", { type: "button", class: "btn btn-quiet" }, icon("form"), "Edit summary");
+  editBtn.hidden = !lec.summary || busyNow;
+  const summaryBox = el("div", { class: "summary-box" }, summaryText, editBtn);
+  editBtn.addEventListener("click", () => {
+    const area = el("textarea", { class: "summary-edit", rows: "12", "aria-label": "Summary" });
+    area.value = lec.summary;
+    const save = el("button", { type: "button", class: "btn btn-primary" }, "Save and check again");
+    const cancel = el("button", { type: "button", class: "btn" }, "Cancel");
+    const editor = el("div", { class: "summary-editor" }, area,
+      el("p", { class: "hint" }, "Fix titles, deadlines or what needs uploading. LecAssist then checks the summary again and asks before doing anything."),
+      el("div", { class: "approval-actions" }, cancel, save));
+    summaryBox.replaceChildren(editor);
+    area.focus();
+    cancel.addEventListener("click", () => summaryBox.replaceChildren(summaryText, editBtn));
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        const updated = await api(`/api/lectures/${lec.id}/summary`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ summary: area.value }),
+        });
+        refreshLecture(updated);
+      } catch (err) {
+        save.disabled = false;
+        editor.append(el("p", { class: "field-error" }, icon("alert"), err.message));
+      }
+    });
+  });
+
   const transcript = el("details", { class: "transcript" }, el("summary", {}, "Transcript"), el("p", {}, lec.transcript || ""));
   transcript.hidden = !lec.transcript;
-  summary.hidden = !lec.summary;
-  const card = el("article", { class: "lecture" },
+
+  // conversation
+  const turns = el("div", { class: "turns" });
+  let replyBox;
+  lec.turns.forEach(turn => {
+    if (turn.text) turns.append(el("div", { class: "msg user" }, el("div", { class: "bubble" }, turn.text)));
+    const agentBox = el("div", { class: "agent-turn" });
+    turns.append(agentBox);
+    if (turn.job.state === "working") {
+      followJob(turn.job.id, agentBox, () => reloadLecture(lec.id), () => replyBox?.focus());
+    } else {
+      agentBox.append(...approvalsList(turn.job),
+        el("div", { class: "bubble" }, turn.job.state === "done" ? plain(turn.job.result) : "Not done: " + turn.job.error));
+    }
+  });
+
+  // reply box
+  let replyFiles = [];
+  const chips = el("div", { class: "chips" });
+  const renderReplyChips = () => chips.replaceChildren(...replyFiles.map((f, i) => el("span", { class: "chip" },
+    el("span", { title: f.name }, f.name),
+    el("button", { type: "button", "aria-label": "Remove " + f.name, onclick: () => { replyFiles.splice(i, 1); renderReplyChips(); } }, icon("x")))));
+  const fileInput = el("input", { type: "file", multiple: "", class: "sr-only" });
+  fileInput.addEventListener("change", () => { replyFiles.push(...fileInput.files); fileInput.value = ""; renderReplyChips(); });
+  replyBox = el("textarea", { rows: "1", "aria-label": "Reply to LecAssist",
+    placeholder: "Answer, or ask for a change: due 20 Nov at 5 pm, call it Lab 3, upload the attached slides" });
+  const send = el("button", { type: "submit", class: "btn btn-primary btn-icon" }, icon("send"), el("span", { class: "sr-only" }, "Send reply"));
+  const reply = el("form", { class: "composer-row lecture-reply" },
+    el("label", { class: "btn btn-icon attach", title: "Attach files" }, fileInput, icon("clip"), el("span", { class: "sr-only" }, "Attach files")),
+    replyBox, send);
+  replyBox.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); reply.requestSubmit(); }
+  });
+  reply.addEventListener("submit", async e => {
+    e.preventDefault();
+    const text = replyBox.value.trim() || (replyFiles.length ? "Upload the attached files." : "");
+    if (!text) { replyBox.focus(); return; }
+    send.disabled = true;
+    try {
+      const fileIds = await uploadFiles(replyFiles);
+      const updated = await api(`/api/lectures/${lec.id}/reply`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, file_ids: fileIds }),
+      });
+      refreshLecture(updated);
+    } catch (err) {
+      send.disabled = false;
+      reply.after(el("p", { class: "field-error" }, icon("alert"), err.message));
+    }
+  });
+  reply.hidden = busyNow || !lec.summary;
+  chips.hidden = reply.hidden;
+
+  card.append(...[
     el("header", {}, el("h3", {}, `${lec.course} · Week ${lec.week}`), el("span", { class: "hint" }, lec.recorded)),
     lec.files.length ? el("p", { class: "hint" }, "Files: " + lec.files.join(", ")) : null,
-    summary, transcript, agentBox);
-  atTop ? into.prepend(card) : into.append(card);
-  if (!lec.job) return;
-  if (["done", "error"].includes(lec.job.state)) {
-    lec.job.approvals.forEach(a => agentBox.append(el("div", { class: "approval " + (a.approved ? "ok" : "muted") },
-      icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : "Declined: ") + a.action))));
-    agentBox.append(el("div", { class: "bubble" }, lec.job.state === "done" ? plain(lec.job.result) : "Not done: " + lec.job.error));
-    return;
+    summaryBox, transcript, turns, chips, reply].filter(Boolean));
+  if (!lec.summary) {
+    // transcript and summary arrive while the first job runs
+    const poll = setInterval(async () => {
+      if (!card.isConnected) return clearInterval(poll);
+      const now = await api(`/api/lectures/${lec.id}`).catch(() => null);
+      if (now?.summary) {
+        clearInterval(poll);
+        summaryText.textContent = now.summary; summaryText.hidden = false;
+        transcript.querySelector("p").textContent = now.transcript; transcript.hidden = false;
+        lec.summary = now.summary; lec.transcript = now.transcript;
+      }
+    }, 3000);
   }
-  if (following.has(lec.job.id + into.id)) return;
-  following.add(lec.job.id + into.id);
-  // fill in transcript and summary as soon as they exist
-  const refresh = setInterval(async () => {
-    const all = await api("/api/lectures").catch(() => []);
-    const now = all.find(x => x.id === lec.id);
-    if (!now) return;
-    if (now.transcript) { transcript.hidden = false; transcript.querySelector("p").textContent = now.transcript; }
-    if (now.summary) { summary.hidden = false; summary.textContent = now.summary; }
-  }, 3000);
-  followJob(lec.job.id, agentBox, done => {
-    clearInterval(refresh);
-    following.delete(lec.job.id + into.id);
-    api("/api/lectures").then(all => {
-      const now = all.find(x => x.id === lec.id);
-      if (now?.summary) { summary.hidden = false; summary.textContent = now.summary; }
-      if (now?.transcript) { transcript.hidden = false; transcript.querySelector("p").textContent = now.transcript; }
-    }).catch(() => {});
-    agentBox.append(el("div", { class: "bubble" }, done.state === "done" ? plain(done.result) : "Not done: " + done.error));
-  });
+  return card;
+}
+
+// Lectures can show in Record and in eLearning; keep every copy of a card current.
+function refreshLecture(lec) {
+  const places = $$(`[data-lecture="${lec.id}"]`);
+  places.forEach(old => old.replaceWith(renderLecture(lec)));
+  return places.length;
+}
+async function reloadLecture(id) {
+  const lec = await api(`/api/lectures/${id}`).catch(() => null);
+  if (lec) refreshLecture(lec);
 }
 
 async function loadLectures() {
@@ -501,7 +595,7 @@ async function loadLectures() {
         el("button", { type: "button", class: "btn btn-primary", onclick: () => openPage("record") }, icon("mic"), "Record a lecture")));
       return;
     }
-    lectures.forEach(lec => renderLecture(lec, list, false));
+    lectures.forEach(lec => list.append(renderLecture(lec)));
   } catch (err) {
     list.replaceChildren(el("div", { class: "notice err" }, icon("alert"), "Unable to load lectures: " + err.message));
   }
