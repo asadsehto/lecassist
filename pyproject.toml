@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "av<17",
     "fastapi>=0.162.4",
+    "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
     "ollama>=0.6.3",
     "playwright>=1.64.1",

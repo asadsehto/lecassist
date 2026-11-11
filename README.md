@@ -35,7 +35,7 @@ Everything can run **offline on the teacher's own machine** (local models throug
 | Browser automation (Playwright) on Moodle: login, create assignment with due date and PDF, upload material to a week, create a course | Done | `src/lecassist/browser.py` |
 | Moodle agent tools + teacher approval before every action | Done | `src/lecassist/moodle_tools.py`, `playground/Agent_2.py` |
 | Audio pipeline: 16 kHz mono conversion, noise reduction, faster-whisper transcription (Urdu default, code-switching prompt), pyannote speaker diarization, merge, WER scoring | Working prototype | `src/lecassist/audio/` |
-| Teacher app, eLearning section: **Ask** (type a request, the local model fills in the details, teacher approves) and **Fill a form** (all fields), with an API for the desktop app | Done | `ui/teacher-app/`, `src/lecassist/server/`, `src/lecassist/moodle_actions.py` |
+| Teacher app: **Record lecture** (record, English transcript, summary, then approve what eLearning needs) and **eLearning** (From lectures, Ask, Fill a form), with an API for the desktop app | Done | `ui/teacher-app/`, `src/lecassist/server/`, `src/lecassist/moodle_actions.py` |
 | Telegram delivery and approval buttons | In progress | — |
 | Desktop app (Electron/React + FastAPI), summaries, semester search, quiz generation | Not started / planned | — |
 
@@ -81,13 +81,15 @@ lecassist/
     ├── browser.py           Playwright: login, create_assignment, upload_material, create_course
     ├── moodle_tools.py      agent tools with lookups, approval and error handling
     ├── moodle_actions.py    full Moodle forms (all fields) used by the teacher forms
-    ├── server/              FastAPI API (app.py) and prompt mode (agent.py)
+    ├── server/              FastAPI API (app.py): runs the agents, approvals go to the app
     ├── playground/          step-by-step learning and test scripts
     │   ├── chat_1.py        first chat with the local model
     │   ├── extract.py       structured output (JSON / Pydantic)
     │   ├── tools_1.py       first tools
     │   ├── Agent_1.py       agent loop from scratch
     │   ├── Agent_2.py       Moodle agent (uses moodle_tools.py)
+    │   ├── Elearning_Agent.py  Agent_2's loop for the app (Ask)
+    │   ├── Summary_Agent.py  lecture summary, then acts on it with the Moodle tools
     │   ├── moodle_1.py      Moodle REST experiments
     │   └── pw_1.py          Playwright tests
     └── audio/               speech pipeline (see audio/README.md)
@@ -127,13 +129,13 @@ Upload /path/to/slides.pdf to AI101 week 4 as Week 4 slides
 Make a new course Computer Vision with short name CV501
 ```
 
-### Run the teacher app (eLearning section)
+### Run the teacher app
 
 ```bash
 uv run --env-file .env python -m lecassist.server
 ```
 
-Open http://127.0.0.1:8100. In **Ask**, choose a task, type the request (hints show what to include), check the plan and approve it. **Fill a form** does the same with every field. The UI only talks to the API (`/docs` lists it), so the desktop app can replace it. See [`ui/teacher-app/README.md`](ui/teacher-app/README.md).
+Open http://127.0.0.1:8100. **Record lecture** records or uploads a lecture; LecAssist transcribes it, writes the summary and asks you to approve the eLearning actions it finds. **eLearning** shows those lectures, and lets you ask for a task or fill a form. The UI only talks to the API (`/docs` lists it), so the desktop app can replace it. See [`ui/teacher-app/README.md`](ui/teacher-app/README.md).
 
 ### Run the audio pipeline
 

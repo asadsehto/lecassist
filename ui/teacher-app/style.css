@@ -326,6 +326,57 @@ label > .hint:last-child { display: block; margin-top: 4px; }
 .notice.err { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .notice a { color: inherit; font-weight: 600; }
 
+/* ---------- record ---------- */
+.rec-card { max-width: 760px; }
+.rec-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  margin: 8px 0 16px; padding: 28px 16px; border-radius: var(--radius-md); background: var(--color-bg-sunken);
+}
+.rec-time { font-size: 2.5rem; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.rec-label { color: var(--color-text-secondary); }
+.rec-panel[data-state="recording"] .rec-label { color: var(--color-danger-text); font-weight: 600; }
+.rec-panel[data-state="recording"] .rec-label::before { content: "● "; }
+.rec-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 10px; }
+.btn-lg { min-height: 44px; padding-inline: 20px; font-size: 0.9375rem; }
+.rec-extra { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.rec-extra .btn:focus-within { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.card .rec-extra label { margin: 0; display: inline-flex; font-weight: 500; }
+.rec-card > .hint { display: block; margin-top: 4px; }
+
+/* ---------- lectures, summaries and approvals ---------- */
+.lecture-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.lecture {
+  padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  background: var(--color-bg-surface); display: flex; flex-direction: column; gap: 10px;
+}
+.lecture header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lecture h3 { font-size: 0.9375rem; font-weight: 600; }
+.summary {
+  margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--color-bg-sunken);
+  font: inherit; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.transcript summary { cursor: pointer; color: var(--color-accent-text); font-weight: 500; }
+.transcript p { margin-top: 8px; color: var(--color-text-secondary); text-wrap: pretty; }
+.agent-turn { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.msg.assistant .agent-turn { width: min(100%, 560px); }
+.agent-turn .bubble { max-width: 100%; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.job-status { color: var(--color-text-secondary); }
+.approval {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px;
+  border-radius: var(--radius-md); overflow-wrap: anywhere;
+}
+.approval .icon { margin-top: 2px; }
+.approval.ok { background: var(--color-success-bg); color: var(--color-success-text); }
+.approval.muted { background: var(--color-bg-sunken); color: var(--color-text-secondary); }
+.approval.open {
+  flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--color-accent-border);
+  background: var(--color-bg-surface); box-shadow: var(--shadow-raised); color: var(--color-text);
+}
+.approval-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--color-accent-text); }
+.approval-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; text-align: center; }
+.empty-title { font-weight: 600; font-size: 0.9375rem; }
+
 /* ---------- coming soon ---------- */
 .view-soon { align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
 .soon-card { max-width: 460px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }

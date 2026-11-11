@@ -1,8 +1,10 @@
-"""HTTP API for the teacher's eLearning actions.
+"""HTTP API for the teacher app.
 
-Any UI (the simple forms in ui/teacher-app now, the desktop app later) calls
-these endpoints. Open http://127.0.0.1:8100/docs for the full list.
+The agents live in lecassist/playground (Elearning_Agent, Summary_Agent) and use
+the tools in lecassist/moodle_tools.py. This file only runs them and passes the
+tools' approve() questions to the app. Open http://127.0.0.1:8100/docs for the list.
 """
+import re
 import tempfile
 import threading
 import uuid
@@ -15,14 +17,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from lecassist import moodle_actions as moodle
-from lecassist.server import agent
+from lecassist import moodle_tools
+from lecassist.playground import Elearning_Agent, Summary_Agent
 
 app = FastAPI(title="LecAssist eLearning API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # One browser action at a time, so two clicks never log in twice in parallel.
 browser_lock = threading.Lock()
-agent_lock = threading.Lock()  # one conversation turn at a time (agent.context is shared)
 categories_cache: list[dict] = []
 
 
@@ -69,10 +71,10 @@ def get_status():
     try:
         import ollama
         names = [m.model for m in ollama.list().models]
-        model_ok = agent.m in names
+        model_ok = Elearning_Agent.m in names
     except Exception:
         model_ok = False
-    return {"moodle": moodle_ok, "model": agent.m.split(":")[0], "model_ok": model_ok}
+    return {"moodle": moodle_ok, "model": Elearning_Agent.m.split(":")[0], "model_ok": model_ok}
 
 
 @app.get("/api/courses")
@@ -174,14 +176,81 @@ def add_material(
     return {"message": f"Material '{name}' uploaded", **result}
 
 
-# ---------- prompt mode ----------
+# ---------- running the agents ----------
+# An agent runs in a background "job". When one of the moodle_tools calls
+# approve(), the job waits and the app shows the question with Yes/No buttons.
 
 UPLOAD_DIR = Path(tempfile.mkdtemp(prefix="lecassist-uploads-"))
+uploads: dict[str, dict] = {}   # file id -> {"name", "path"}
+jobs: dict[str, dict] = {}
+lectures: list[dict] = []       # recorded lectures, newest first (kept while the server runs)
+current = threading.local()     # which job the current thread belongs to
+
+
+def app_approve(action: str) -> bool:
+    """Replaces moodle_tools.approve: ask in the app instead of input()."""
+    job = current.job
+    action = re.sub(re.escape(str(UPLOAD_DIR)) + r"/[0-9a-f]+/", "", action)  # show file names, not temp paths
+    job["question"] = action
+    job["answer"] = None
+    job["event"].clear()
+    job["event"].wait(timeout=1800)
+    yes = job["answer"] is True
+    job["approvals"].append({"action": action, "approved": yes})
+    job["question"] = None
+    return yes
+
+
+moodle_tools.approve = app_approve
+
+
+def start_job(work, *args) -> dict:
+    job = {"id": uuid.uuid4().hex, "state": "working", "stage": "", "question": None, "answer": None,
+           "approvals": [], "result": None, "error": None, "event": threading.Event()}
+    jobs[job["id"]] = job
+
+    def target():
+        current.job = job
+        try:
+            job["result"] = work(job, *args)
+            job["state"] = "done"
+        except Exception as e:
+            job["error"] = str(e)
+            job["state"] = "error"
+
+    threading.Thread(target=target, daemon=True).start()
+    return job
+
+
+def job_view(job: dict) -> dict:
+    return {k: job[k] for k in ("id", "state", "stage", "question", "approvals", "result", "error")}
+
+
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str):
+    if job_id not in jobs:
+        raise HTTPException(404, "No such job")
+    return job_view(jobs[job_id])
+
+
+class AnswerIn(BaseModel):
+    approve: bool
+
+
+@app.post("/api/jobs/{job_id}/answer")
+def answer_job(job_id: str, body: AnswerIn):
+    """The teacher's Yes/No for the job's current question."""
+    job = jobs.get(job_id)
+    if job is None or job["question"] is None:
+        raise HTTPException(404, "Nothing is waiting for an answer")
+    job["answer"] = body.approve
+    job["event"].set()
+    return {"ok": True}
 
 
 @app.post("/api/uploads")
 def upload_files(files: list[UploadFile] = File(...)):
-    """Keep files for a prompt; send their ids with /api/agent/plan."""
+    """Keep files for a request; send their ids with /api/agent/ask or /api/lectures."""
     saved = []
     for f in files:
         if not f.filename:
@@ -191,55 +260,87 @@ def upload_files(files: list[UploadFile] = File(...)):
         folder.mkdir()
         path = folder / Path(f.filename).name
         path.write_bytes(f.file.read())
-        agent.uploads[file_id] = {"name": path.name, "path": str(path)}
+        uploads[file_id] = {"name": path.name, "path": str(path)}
         saved.append({"id": file_id, "name": path.name})
     return saved
 
+
+def course_name(course_id: int | None) -> str:
+    for c in moodle.list_courses():
+        if c["id"] == course_id:
+            return c["shortname"]
+    return ""
+
+
+# ---------- Ask (eLearning) ----------
 
 class Message(BaseModel):
     role: str
     content: str
 
 
-class PlanIn(BaseModel):
+class AskIn(BaseModel):
     messages: list[Message]
     task: str = "assignment"
     course_id: int | None = None
     file_ids: list[str] = []
 
 
-@app.post("/api/agent/plan")
-def agent_plan(body: PlanIn):
-    """Turn the conversation into a plan to approve, or a question back to the teacher."""
-    try:
-        if body.task not in agent.tools:
-            raise HTTPException(400, "task must be assignment, material or course")
-        with agent_lock:
-            return agent.ask_agent([m.model_dump() for m in body.messages], body.task, body.course_id, body.file_ids)
-    except HTTPException:
-        raise
-    except RuntimeError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(503, f"The assistant is not available: {e}. Check that Ollama is running.")
+TASK_TOOLS = {"assignment": ["add_assignment"], "material": ["add_material"], "course": ["add_course"]}
 
 
-class RunIn(BaseModel):
-    plan_id: str
+@app.post("/api/agent/ask")
+def agent_ask(body: AskIn):
+    """Start Elearning_Agent on the conversation; poll /api/jobs/{id} for questions and the answer."""
+    if body.task not in TASK_TOOLS:
+        raise HTTPException(400, "task must be assignment, material or course")
+    files = [uploads[i]["path"] for i in body.file_ids if i in uploads]
+    course = course_name(body.course_id) if body.task != "course" else ""
+
+    def work(job):
+        return Elearning_Agent.run_agent([m.model_dump() for m in body.messages],
+                                         TASK_TOOLS[body.task], course, files)
+
+    return job_view(start_job(work))
 
 
-@app.post("/api/agent/run")
-def agent_run(body: RunIn):
-    """Carry out a plan the teacher approved."""
-    with browser_lock:
-        try:
-            result = agent.run(body.plan_id)
-        except KeyError as e:
-            raise HTTPException(404, str(e.args[0]))
-        except RuntimeError as e:
-            raise HTTPException(400, str(e))
-    done = {"assignment": "Assignment created", "material": "Material uploaded", "course": "Course created"}
-    return {"message": done[result["task"]], **result}
+# ---------- Record (lectures) ----------
+
+@app.post("/api/lectures")
+def new_lecture(audio: UploadFile = File(...), course_id: int = Form(...), week: int = Form(...),
+                file_ids: str = Form("")):
+    """Recorded audio -> English transcript -> summary -> Summary_Agent asks to do what is needed."""
+    folder = UPLOAD_DIR / uuid.uuid4().hex
+    folder.mkdir()
+    audio_path = folder / (Path(audio.filename or "lecture.webm").name)
+    audio_path.write_bytes(audio.file.read())
+    files = [uploads[i]["path"] for i in file_ids.split(",") if i in uploads]
+    course = course_name(course_id)
+    if not course:
+        raise HTTPException(400, "Choose one of your courses")
+    lecture = {"id": uuid.uuid4().hex, "course": course, "week": week,
+               "recorded": datetime.now().strftime("%a %d %b %Y, %H:%M"),
+               "files": [Path(f).name for f in files], "transcript": "", "summary": "", "job": None}
+    lectures.insert(0, lecture)
+
+    def work(job):
+        from lecassist.audio.translate import transcribe_english
+        job["stage"] = "Transcribing"
+        lecture["transcript"] = transcribe_english(str(audio_path))
+        job["stage"] = "Summarising"
+        lecture["summary"] = Summary_Agent.summarize(lecture["transcript"])
+        job["stage"] = "Checking what eLearning needs"
+        return Summary_Agent.act_on_summary(lecture["summary"], course, week, files)
+
+    job = start_job(work)
+    lecture["job"] = job["id"]
+    return {"lecture": lecture, "job": job_view(job)}
+
+
+@app.get("/api/lectures")
+def get_lectures():
+    """Recorded lectures with their summaries and the state of their actions."""
+    return [{**lec, "job": job_view(jobs[lec["job"]]) if lec["job"] in jobs else None} for lec in lectures]
 
 
 # The simple teacher forms. A different UI can ignore this and call /api directly.

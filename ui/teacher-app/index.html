@@ -25,6 +25,8 @@
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
     <symbol id="i-form" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></symbol>
   </svg>
 
@@ -37,13 +39,14 @@
 
       <nav class="nav" aria-label="Sections">
         <p class="nav-label">Workspace</p>
-        <a class="nav-item" href="#" aria-current="page">
+        <a class="nav-item" href="#record" data-page="record" aria-current="page">
+          <svg class="icon"><use href="#i-mic"/></svg><span>Record lecture</span>
+        </a>
+        <a class="nav-item" href="#elearning" data-page="elearning">
           <svg class="icon"><use href="#i-school"/></svg><span>eLearning</span>
         </a>
 
         <p class="nav-label">Coming next</p>
-        <button class="nav-item soon" type="button" data-soon="lectures"><svg class="icon"><use href="#i-mic"/></svg><span>Lectures</span><span class="badge">Soon</span></button>
-        <button class="nav-item soon" type="button" data-soon="summaries"><svg class="icon"><use href="#i-notes"/></svg><span>Summaries</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="marks"><svg class="icon"><use href="#i-marks"/></svg><span>Marks</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="messages"><svg class="icon"><use href="#i-chat"/></svg><span>Telegram &amp; WhatsApp</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="search"><svg class="icon"><use href="#i-search"/></svg><span>Semester search</span><span class="badge">Soon</span></button>
@@ -59,11 +62,14 @@
     <main class="main" id="main">
       <header class="page-head">
         <div>
-          <h1>eLearning</h1>
-          <p class="sub">Create assignments, upload material and create courses on the portal.</p>
+          <h1>Record lecture</h1>
+          <p class="sub">Record or upload a lecture. LecAssist writes the summary and finds what eLearning needs.</p>
         </div>
-        <div class="segmented" role="tablist" aria-label="How to do it">
-          <button role="tab" id="mode-ask" aria-controls="view-ask" aria-selected="true">
+        <div class="segmented" role="tablist" aria-label="How to do it" hidden>
+          <button role="tab" id="mode-lectures" aria-controls="view-lectures" aria-selected="true">
+            <svg class="icon"><use href="#i-notes"/></svg>From lectures
+          </button>
+          <button role="tab" id="mode-ask" aria-controls="view-ask" aria-selected="false" tabindex="-1">
             <svg class="icon"><use href="#i-spark"/></svg>Ask
           </button>
           <button role="tab" id="mode-form" aria-controls="view-form" aria-selected="false" tabindex="-1">
@@ -72,8 +78,55 @@
         </div>
       </header>
 
+      <!-- ================= Record lecture ================= -->
+      <section class="view" id="view-record">
+        <div class="form-scroll">
+          <form class="card rec-card" id="record-form" novalidate>
+            <div class="row">
+              <label>Course <span class="req" aria-hidden="true">*</span>
+                <select name="course_id" class="course-select" required><option value="">Loading courses…</option></select>
+              </label>
+              <label>Week <span class="req" aria-hidden="true">*</span>
+                <select name="section" class="week-select" required disabled><option value="">Choose a course first</option></select>
+              </label>
+            </div>
+
+            <div class="rec-panel" id="rec-panel" data-state="idle">
+              <p class="rec-time" id="rec-time" aria-live="off">00:00</p>
+              <p class="rec-label" id="rec-label" role="status">Ready to record</p>
+              <div class="rec-buttons">
+                <button type="button" class="btn btn-primary btn-lg" id="rec-start"><svg class="icon"><use href="#i-mic"/></svg>Start recording</button>
+                <button type="button" class="btn btn-lg" id="rec-pause" hidden><svg class="icon"><use href="#i-pause"/></svg>Pause</button>
+                <button type="button" class="btn btn-primary btn-lg" id="rec-stop" hidden><svg class="icon"><use href="#i-stop"/></svg>Stop and process</button>
+              </div>
+            </div>
+
+            <div class="rec-extra">
+              <label class="btn">
+                <input type="file" id="rec-file" accept="audio/*,video/*" class="sr-only">
+                <svg class="icon"><use href="#i-upload"/></svg>Upload a recording
+              </label>
+              <label class="btn">
+                <input type="file" id="lecture-files" multiple class="sr-only">
+                <svg class="icon"><use href="#i-clip"/></svg>Add slides for this lecture
+              </label>
+            </div>
+            <div class="chips" id="lecture-chips" aria-label="Files for this lecture"></div>
+            <p class="hint">After you stop, LecAssist writes an English transcript and a summary, then asks you to approve what eLearning needs, like the assignments you announced or uploading the slides.</p>
+          </form>
+          <div id="record-results" class="lecture-list"></div>
+        </div>
+      </section>
+
+      <!-- ================= From lectures ================= -->
+      <section class="view" id="view-lectures" role="tabpanel" aria-labelledby="mode-lectures" hidden>
+        <div class="form-scroll">
+          <div id="lecture-list" class="lecture-list"></div>
+        </div>
+      </section>
+
       <!-- ================= Ask ================= -->
-      <section class="view view-ask" id="view-ask" role="tabpanel" aria-labelledby="mode-ask">
+      <section class="view view-ask" id="view-ask" role="tabpanel" aria-labelledby="mode-ask" hidden>
         <div class="ask-scroll" id="ask-scroll">
           <fieldset class="tasks">
             <legend>What do you want to do?</legend>

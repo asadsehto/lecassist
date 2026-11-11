@@ -68,32 +68,47 @@ function tabList(tabs, onSelect) {
 
 const selectMode = tabList($$(".segmented [role=tab]"), tab => {
   if (tab.id === "mode-ask") $("#prompt").focus();
+  if (tab.id === "mode-lectures") loadLectures();
 });
 const selectFormTab = tabList($$(".tabs [role=tab]"), tab => {
   $("#form-result").hidden = true;
   if (tab.id === "tab-course") loadCategories();
 });
 
-// ---------- sidebar: coming soon ----------
+// ---------- sidebar ----------
 const SOON = {
-  lectures: ["mic", "Lectures", "Press record in class and LecAssist cleans the audio and writes a transcript in Urdu and English, with the teacher's voice separated from the students'.",
-    ["Record, pause and resume in one file", "Import recordings from your phone", "Transcript lines linked to the audio"]],
-  summaries: ["notes", "Summaries", "Every lecture becomes a summary, a list of key terms and the assignments and deadlines you announced.",
-    ["Short, detailed or exam-focused notes", "Deadlines sent straight to eLearning after you approve", "Edit before anything is shared"]],
   marks: ["marks", "Marks", "Give LecAssist your marks sheet and it enters the marks into the LMS for you, after you approve.",
     ["Upload from an Excel sheet", "Check every row before it is submitted"]],
-  messages: ["chat", "Telegram & WhatsApp", "Get summaries on your phone and give instructions like this page does, from a chat.",
+  messages: ["chat", "Telegram & WhatsApp", "Get summaries on your phone and give instructions like this app does, from a chat.",
     ["Summaries sent to the class group", "Approve actions with a Yes or No button"]],
   search: ["search", "Semester search", "Ask a question and get the answer from all your lectures, with the lecture and date it came from.",
     ["Search across every lecture", "Compare two lectures"]],
   quizzes: ["quiz", "Quizzes & papers", "Generate quizzes and full exam papers from what you actually taught.",
     ["Multiple choice and short questions", "Papers balanced across weeks"]],
 };
+const PAGES = {
+  record: ["Record lecture", "Record or upload a lecture. LecAssist writes the summary and finds what eLearning needs."],
+  elearning: ["eLearning", "Approve what your lectures need, ask for a task, or fill a form."],
+};
 const navItems = $$(".nav-item");
 function showView(id) {
-  ["view-ask", "view-form", "view-soon"].forEach(v => { $("#" + v).hidden = v !== id; });
-  $(".segmented").hidden = id === "view-soon";
+  ["view-record", "view-lectures", "view-ask", "view-form", "view-soon"].forEach(v => { $("#" + v).hidden = v !== id; });
+  $(".segmented").hidden = !["view-lectures", "view-ask", "view-form"].includes(id);
 }
+function openPage(name) {
+  navItems.forEach(n => n.dataset.page === name ? n.setAttribute("aria-current", "page") : n.removeAttribute("aria-current"));
+  if (PAGES[name]) {
+    $(".page-head h1").textContent = PAGES[name][0];
+    $(".page-head .sub").textContent = PAGES[name][1];
+  }
+  if (name === "record") showView("view-record");
+  if (name === "elearning") {
+    const tab = $(".segmented [aria-selected=true]");
+    showView($("#" + tab.getAttribute("aria-controls")).id);
+    if (tab.id === "mode-lectures") loadLectures();
+  }
+}
+$$(".nav-item[data-page]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); openPage(a.dataset.page); }));
 $$(".nav-item.soon").forEach(btn => btn.addEventListener("click", () => {
   const [ic, title, text, points] = SOON[btn.dataset.soon];
   $("#soon-icon use").setAttribute("href", "#i-" + ic);
@@ -107,16 +122,7 @@ $$(".nav-item.soon").forEach(btn => btn.addEventListener("click", () => {
   showView("view-soon");
   $("#soon-back").focus();
 }));
-function backToElearning() {
-  navItems.forEach(n => n.removeAttribute("aria-current"));
-  navItems[0].setAttribute("aria-current", "page");
-  $(".page-head h1").textContent = "eLearning";
-  $(".page-head .sub").textContent = "Create assignments, upload material and create courses on the portal.";
-  const askOn = $("#mode-ask").getAttribute("aria-selected") === "true";
-  showView(askOn ? "view-ask" : "view-form");
-}
-navItems[0].addEventListener("click", e => { e.preventDefault(); backToElearning(); });
-$("#soon-back").addEventListener("click", backToElearning);
+$("#soon-back").addEventListener("click", () => openPage("elearning"));
 
 // ---------- connection status ----------
 async function loadStatus() {
@@ -133,28 +139,93 @@ async function loadStatus() {
   }
 }
 
+// ---------- jobs: an agent running on the server ----------
+// The agent's tools ask approve(); the question shows here with Approve / Decline.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const plain = text => (text || "").replace(/\*\*/g, "");  // the model writes **bold**
+
+async function followJob(jobId, box, onDone) {
+  let shownQuestion = null;
+  let shownApprovals = 0;
+  const status = el("p", { class: "job-status" });
+  box.append(status);
+  for (;;) {
+    let job;
+    try {
+      job = await api("/api/jobs/" + jobId);
+    } catch (err) {
+      status.textContent = "Lost contact with LecAssist: " + err.message;
+      return;
+    }
+    while (shownApprovals < job.approvals.length) {
+      const a = job.approvals[shownApprovals++];
+      box.querySelector(".approval.open")?.remove();
+      box.insertBefore(el("div", { class: "approval " + (a.approved ? "ok" : "muted") },
+        icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : "Declined: ") + a.action)), status);
+    }
+    if (job.question && job.question !== shownQuestion) {
+      shownQuestion = job.question;
+      box.insertBefore(approvalCard(jobId, job.question), status);
+      scrollDown();
+    }
+    if (!job.question) shownQuestion = null;
+    status.textContent = job.state === "working"
+      ? (job.question ? "Waiting for your approval…" : (job.stage || "Thinking") + "…") : "";
+    status.hidden = job.state !== "working";
+    if (job.state === "done" || job.state === "error") {
+      onDone(job);
+      return;
+    }
+    await sleep(1200);
+  }
+}
+
+function approvalCard(jobId, question) {
+  const yes = el("button", { type: "button", class: "btn btn-primary" }, "Approve");
+  const no = el("button", { type: "button", class: "btn" }, "Decline");
+  const card = el("div", { class: "approval open", role: "group", "aria-label": "Needs your approval" },
+    el("p", { class: "approval-title" }, icon("alert"), "Needs your approval"),
+    el("p", { class: "approval-text" }, question),
+    el("div", { class: "approval-actions" }, no, yes));
+  const answer = async approve => {
+    yes.disabled = no.disabled = true;
+    try {
+      await api(`/api/jobs/${jobId}/answer`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve }),
+      });
+    } catch (err) {
+      yes.disabled = no.disabled = false;
+      card.append(el("p", { class: "field-error" }, icon("alert"), err.message));
+    }
+  };
+  yes.addEventListener("click", () => answer(true));
+  no.addEventListener("click", () => answer(false));
+  setTimeout(() => yes.focus(), 0);
+  return card;
+}
+
 // ---------- Ask ----------
 const TASKS = {
   assignment: {
     required: ["Course, e.g. AI101 (or choose it above)", "Week number", "Title", "Due date and time"],
-    optional: ["Total marks, e.g. 20 marks", "Attach the question paper", "Instructions and other dates: use Edit in form"],
-    example: "Create Lab 5 in AI101 week 5, due next Friday at 11:59 pm, 20 marks. Students should implement BFS and DFS.",
+    optional: ["Attach the question paper", "Marks, instructions and other dates: use Fill a form"],
+    example: "Create Lab 5 in AI101 week 5, due next Friday at 11:59 pm.",
     placeholder: "Create Lab 5 in AI101 week 5, due next Friday at 11:59 pm",
-    action: "Create assignment", files: true,
+    files: true,
   },
   material: {
     required: ["Course, e.g. AI101 (or choose it above)", "Week number", "Title students see", "Attach the files"],
-    optional: ["A note for students: use Edit in form"],
+    optional: ["A note for students: use Fill a form"],
     example: "Upload these slides to AI101 week 3 as Week 3 slides.",
     placeholder: "Upload these slides to AI101 week 3 as Week 3 slides",
-    action: "Upload material", files: true,
+    files: true,
   },
   course: {
     required: ["Full name", "Short name, unique on the portal"],
-    optional: ["Start date", "Number of weeks", "Description: use Edit in form"],
-    example: "Create a course Data Mining, short name DM401, starting 1 December for 16 weeks.",
-    placeholder: "Create a course Data Mining, short name DM401, starting 1 December",
-    action: "Create course", files: false,
+    optional: ["Number of weeks", "Description and dates: use Fill a form"],
+    example: "Create a course Data Mining, short name DM401, for 16 weeks.",
+    placeholder: "Create a course Data Mining, short name DM401",
+    files: false,
   },
 };
 
@@ -174,12 +245,6 @@ function showHints() {
   $("#example-text").textContent = "“" + t.example + "”";
   promptBox.placeholder = t.placeholder;
   $("#attach-label").hidden = !t.files;
-}
-
-function resetConversation(task = currentTask()) {
-  conversations[task] = [];
-  files = [];
-  renderChips();
 }
 
 $$("input[name=task]").forEach(r => r.addEventListener("change", () => {
@@ -231,10 +296,10 @@ function addMessage(role, text, extra, task = currentTask()) {
   return li;
 }
 
-async function uploadFiles() {
-  if (!files.length) return [];
+async function uploadFiles(list) {
+  if (!list.length) return [];
   const data = new FormData();
-  files.forEach(f => data.append("files", f));
+  list.forEach(f => data.append("files", f));
   const saved = await api("/api/uploads", { method: "POST", body: data });
   return saved.map(s => s.id);
 }
@@ -254,27 +319,30 @@ $("#composer").addEventListener("submit", async e => {
   addMessage("user", text, names ? el("span", { class: "files" }, "Attached: " + names) : null, task);
   promptBox.value = "";
   autosize();
-  const working = addMessage("assistant working", "Thinking…", null, task);
+  const box = el("div", { class: "agent-turn" });
+  const li = el("li", { class: "msg assistant" }, box);
+  threadFor(task).append(li);
+  scrollDown();
   try {
-    const fileIds = await uploadFiles();
+    const fileIds = await uploadFiles(files);
+    files = [];
+    renderChips();
     conversation.push({ role: "user", content: text });
-    const res = await api("/api/agent/plan", {
+    const job = await api("/api/agent/ask", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: conversation, task, file_ids: fileIds,
         course_id: task !== "course" && $("#ask-course").value ? Number($("#ask-course").value) : null }),
     });
-    working.remove();
-    if (res.type === "plan") {
-      conversation.push({ role: "assistant", content: "Ready to do it. Waiting for approval." });
-      showPlan(res, task);
-    } else {
-      conversation.push({ role: "assistant", content: res.reply });
-      addMessage("assistant", res.reply, null, task);
-    }
+    await followJob(job.id, box, done => {
+      const reply = done.state === "done" ? done.result : "Not done: " + done.error;
+      conversation.push({ role: "assistant", content: reply || "" });
+      box.append(el("div", { class: "bubble" }, plain(reply) || "Done."));
+      if (task === "course" && done.approvals.some(a => a.approved)) loadCourses();
+      scrollDown();
+    });
   } catch (err) {
-    working.remove();
     conversation.pop();
-    addMessage("assistant", "Unable to read the request: " + err.message, null, task);
+    box.append(el("div", { class: "bubble" }, "Unable to start: " + err.message));
   } finally {
     busy = false;
     $("#send").disabled = false;
@@ -282,77 +350,161 @@ $("#composer").addEventListener("submit", async e => {
   }
 });
 
-const TITLES = { assignment: "New assignment", material: "New material", course: "New course" };
-const DONE_LINK = { assignment: "Open assignment", material: "Open material", course: "Open course" };
+// ---------- Record lecture ----------
+let recorder = null;
+let chunks = [];
+let timer = null;
+let seconds = 0;
+let lectureFiles = [];
 
-function showPlan(plan, task) {
-  const rows = el("dl", { class: "rows" }, ...plan.rows.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)]));
-  const approve = el("button", { type: "button", class: "btn btn-primary" }, TASKS[plan.task].action);
-  const edit = el("button", { type: "button", class: "btn" }, "Edit in form");
-  const discard = el("button", { type: "button", class: "btn" }, "Discard");
-  const actions = el("div", { class: "plan-actions" }, discard, edit, approve);
-  const card = el("div", { class: "plan", role: "group", "aria-label": TITLES[plan.task] },
-    el("div", { class: "plan-head" }, icon(plan.task === "course" ? "course" : plan.task === "material" ? "upload" : "assignment"), TITLES[plan.task]),
-    rows, actions);
-  const li = el("li", { class: "msg assistant" }, card);
-  threadFor(task).append(li);
-  scrollDown();
-  approve.focus();
-  const sentFiles = files.slice();
-  resetConversation(task);
+const recBtn = $("#rec-start");
+const pauseBtn = $("#rec-pause");
+const stopBtn = $("#rec-stop");
+const clock = () => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
-  const finish = (cls, ...content) => {
-    actions.replaceWith(el("div", { class: "plan-state " + cls }, ...content));
-    scrollDown();
-  };
-  discard.addEventListener("click", () => {
-    finish("muted", icon("x"), "Discarded. Nothing was changed on eLearning.");
-    promptBox.focus();
+function recordState(state) {
+  $("#rec-panel").dataset.state = state;
+  recBtn.hidden = state !== "idle";
+  pauseBtn.hidden = stopBtn.hidden = state === "idle";
+  pauseBtn.replaceChildren(icon(state === "paused" ? "mic" : "pause"), state === "paused" ? "Resume" : "Pause");
+  $("#rec-label").textContent = { idle: "Ready to record", recording: "Recording", paused: "Paused" }[state];
+}
+
+function checkWhere() {
+  const form = $("#record-form");
+  let ok = true;
+  [form.elements.course_id, form.elements.section].forEach(f => {
+    setError(f, f.value ? "" : "Choose this before recording.");
+    if (!f.value) ok = false;
   });
-  edit.addEventListener("click", () => {
-    finish("muted", icon("form"), "Moved to the form for editing.");
-    openInForm(plan, sentFiles);
-  });
-  approve.addEventListener("click", async () => {
-    [approve, edit, discard].forEach(b => (b.disabled = true));
-    approve.textContent = "Working on eLearning…";
-    try {
-      const res = await api("/api/agent/run", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: plan.plan_id }),
-      });
-      const link = res.url ? el("a", { href: res.url, target: "_blank", rel: "noopener" }, DONE_LINK[plan.task], icon("external")) : null;
-      finish("ok", icon("check"), el("span", {}, res.message + ". "), link);
-      if (plan.task === "course") loadCourses();
-    } catch (err) {
-      finish("err", icon("alert"), "Not done: " + err.message + " Nothing else was changed.");
-    }
-    promptBox.focus();
+  if (!ok) (form.elements.course_id.value ? form.elements.section : form.elements.course_id).focus();
+  return ok;
+}
+
+recBtn.addEventListener("click", async () => {
+  if (!checkWhere()) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recorder = new MediaRecorder(stream);
+    chunks = [];
+    recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const type = recorder.mimeType || "audio/webm";
+      const ext = type.includes("mp4") ? "m4a" : "webm";
+      sendLecture(new File(chunks, `lecture-${Date.now()}.${ext}`, { type }));
+    };
+    recorder.start(1000);
+    seconds = 0;
+    $("#rec-time").textContent = clock();
+    timer = setInterval(() => {
+      if (recorder?.state === "recording") { seconds++; $("#rec-time").textContent = clock(); }
+    }, 1000);
+    recordState("recording");
+  } catch (err) {
+    $("#rec-label").textContent = "Unable to use the microphone: " + err.message;
+  }
+});
+pauseBtn.addEventListener("click", () => {
+  if (recorder.state === "recording") { recorder.pause(); recordState("paused"); }
+  else { recorder.resume(); recordState("recording"); }
+});
+stopBtn.addEventListener("click", () => {
+  clearInterval(timer);
+  recorder.stop();
+  recordState("idle");
+});
+$("#rec-file").addEventListener("change", e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (file && checkWhere()) sendLecture(file);
+});
+$("#lecture-files").addEventListener("change", e => {
+  lectureFiles.push(...e.target.files);
+  e.target.value = "";
+  renderLectureFiles();
+});
+function renderLectureFiles() {
+  $("#lecture-chips").replaceChildren(...lectureFiles.map((f, i) => el("span", { class: "chip" },
+    el("span", { title: f.name }, f.name),
+    el("button", { type: "button", "aria-label": "Remove " + f.name, onclick: () => { lectureFiles.splice(i, 1); renderLectureFiles(); } }, icon("x")),
+  )));
+}
+
+async function sendLecture(audio) {
+  const form = $("#record-form");
+  const data = new FormData();
+  data.append("audio", audio);
+  data.append("course_id", form.elements.course_id.value);
+  data.append("week", form.elements.section.value);
+  try {
+    data.append("file_ids", (await uploadFiles(lectureFiles)).join(","));
+    lectureFiles = [];
+    renderLectureFiles();
+    const res = await api("/api/lectures", { method: "POST", body: data });
+    renderLecture(res.lecture, $("#record-results"), true);
+  } catch (err) {
+    $("#record-results").prepend(el("div", { class: "notice err" }, icon("alert"), "Not sent: " + err.message));
+  }
+}
+
+// One lecture: summary, then the agent's approvals and what it did.
+const following = new Set();
+function renderLecture(lec, into, atTop) {
+  const summary = el("pre", { class: "summary" }, lec.summary || "");
+  const agentBox = el("div", { class: "agent-turn" });
+  const transcript = el("details", { class: "transcript" }, el("summary", {}, "Transcript"), el("p", {}, lec.transcript || ""));
+  transcript.hidden = !lec.transcript;
+  summary.hidden = !lec.summary;
+  const card = el("article", { class: "lecture" },
+    el("header", {}, el("h3", {}, `${lec.course} · Week ${lec.week}`), el("span", { class: "hint" }, lec.recorded)),
+    lec.files.length ? el("p", { class: "hint" }, "Files: " + lec.files.join(", ")) : null,
+    summary, transcript, agentBox);
+  atTop ? into.prepend(card) : into.append(card);
+  if (!lec.job) return;
+  if (["done", "error"].includes(lec.job.state)) {
+    lec.job.approvals.forEach(a => agentBox.append(el("div", { class: "approval " + (a.approved ? "ok" : "muted") },
+      icon(a.approved ? "check" : "x"), el("span", {}, (a.approved ? "Approved: " : "Declined: ") + a.action))));
+    agentBox.append(el("div", { class: "bubble" }, lec.job.state === "done" ? plain(lec.job.result) : "Not done: " + lec.job.error));
+    return;
+  }
+  if (following.has(lec.job.id + into.id)) return;
+  following.add(lec.job.id + into.id);
+  // fill in transcript and summary as soon as they exist
+  const refresh = setInterval(async () => {
+    const all = await api("/api/lectures").catch(() => []);
+    const now = all.find(x => x.id === lec.id);
+    if (!now) return;
+    if (now.transcript) { transcript.hidden = false; transcript.querySelector("p").textContent = now.transcript; }
+    if (now.summary) { summary.hidden = false; summary.textContent = now.summary; }
+  }, 3000);
+  followJob(lec.job.id, agentBox, done => {
+    clearInterval(refresh);
+    following.delete(lec.job.id + into.id);
+    api("/api/lectures").then(all => {
+      const now = all.find(x => x.id === lec.id);
+      if (now?.summary) { summary.hidden = false; summary.textContent = now.summary; }
+      if (now?.transcript) { transcript.hidden = false; transcript.querySelector("p").textContent = now.transcript; }
+    }).catch(() => {});
+    agentBox.append(el("div", { class: "bubble" }, done.state === "done" ? plain(done.result) : "Not done: " + done.error));
   });
 }
 
-async function openInForm(plan, sentFiles) {
-  selectMode($("#mode-form"));
-  selectFormTab($("#tab-" + plan.task));
-  const form = $("#form-" + plan.task);
-  const f = plan.form;
-  for (const [name, value] of Object.entries(f)) {
-    const field = form.elements[name];
-    if (field && name !== "section" && name !== "course_id") field.value = value;
+async function loadLectures() {
+  const list = $("#lecture-list");
+  try {
+    const lectures = await api("/api/lectures");
+    list.replaceChildren();
+    if (!lectures.length) {
+      list.append(el("div", { class: "empty" }, el("p", { class: "empty-title" }, "No lectures yet"),
+        el("p", { class: "hint" }, "Record a lecture and its summary and actions show up here for approval."),
+        el("button", { type: "button", class: "btn btn-primary", onclick: () => openPage("record") }, icon("mic"), "Record a lecture")));
+      return;
+    }
+    lectures.forEach(lec => renderLecture(lec, list, false));
+  } catch (err) {
+    list.replaceChildren(el("div", { class: "notice err" }, icon("alert"), "Unable to load lectures: " + err.message));
   }
-  if (f.description && form.elements.show_description) form.elements.show_description.checked = true;
-  if (f.course_id) {
-    form.elements.course_id.value = f.course_id;
-    await loadWeeks(form);
-    form.elements.section.value = f.section;
-  }
-  const fileInput = form.elements.attachments || form.elements.files;
-  if (fileInput && sentFiles.length) {
-    const dt = new DataTransfer();
-    sentFiles.forEach(file => dt.items.add(file));
-    fileInput.files = dt.files;
-  }
-  form.querySelector("input, select, textarea").focus();
 }
 
 // ---------- dropdowns ----------
@@ -530,3 +682,4 @@ showHints();
 setToday();
 loadCourses();
 loadStatus();
+openPage(location.hash === "#elearning" ? "elearning" : "record");
