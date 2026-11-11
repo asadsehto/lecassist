@@ -8,10 +8,13 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.162.4",
     "httpx>=0.28.1",
     "ollama>=0.6.3",
     "playwright>=1.64.1",
     "pydantic>=2.14.1",
+    "python-multipart>=0.0.33",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]

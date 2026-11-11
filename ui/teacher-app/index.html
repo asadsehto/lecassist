@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LecAssist</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg aria-hidden="true" style="display:none">
+    <symbol id="i-school" viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/><path d="M22 10v6"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></symbol>
+    <symbol id="i-notes" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-marks" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9z"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-quiz" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/></symbol>
+    <symbol id="i-assignment" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-course" viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6.5A2.5 2.5 0 0 0 4 20.5 2.5 2.5 0 0 0 6.5 23H20"/><path d="M12 7v6M9 10h6"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21 12-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+    <symbol id="i-form" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></symbol>
+  </svg>
+
+  <div class="app">
+    <aside class="sidebar" aria-label="LecAssist">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">L</span>
+        <span>LecAssist</span>
+      </div>
+
+      <nav class="nav" aria-label="Sections">
+        <p class="nav-label">Workspace</p>
+        <a class="nav-item" href="#" aria-current="page">
+          <svg class="icon"><use href="#i-school"/></svg><span>eLearning</span>
+        </a>
+
+        <p class="nav-label">Coming next</p>
+        <button class="nav-item soon" type="button" data-soon="lectures"><svg class="icon"><use href="#i-mic"/></svg><span>Lectures</span><span class="badge">Soon</span></button>
+        <button class="nav-item soon" type="button" data-soon="summaries"><svg class="icon"><use href="#i-notes"/></svg><span>Summaries</span><span class="badge">Soon</span></button>
+        <button class="nav-item soon" type="button" data-soon="marks"><svg class="icon"><use href="#i-marks"/></svg><span>Marks</span><span class="badge">Soon</span></button>
+        <button class="nav-item soon" type="button" data-soon="messages"><svg class="icon"><use href="#i-chat"/></svg><span>Telegram &amp; WhatsApp</span><span class="badge">Soon</span></button>
+        <button class="nav-item soon" type="button" data-soon="search"><svg class="icon"><use href="#i-search"/></svg><span>Semester search</span><span class="badge">Soon</span></button>
+        <button class="nav-item soon" type="button" data-soon="quizzes"><svg class="icon"><use href="#i-quiz"/></svg><span>Quizzes &amp; papers</span><span class="badge">Soon</span></button>
+      </nav>
+
+      <dl class="status" aria-label="Connections">
+        <div><dt>eLearning</dt><dd id="status-moodle"><span class="dot" aria-hidden="true"></span><span>Checking…</span></dd></div>
+        <div><dt>Model</dt><dd id="status-model"><span class="dot ok" aria-hidden="true"></span><span>Local</span></dd></div>
+      </dl>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="page-head">
+        <div>
+          <h1>eLearning</h1>
+          <p class="sub">Create assignments, upload material and create courses on the portal.</p>
+        </div>
+        <div class="segmented" role="tablist" aria-label="How to do it">
+          <button role="tab" id="mode-ask" aria-controls="view-ask" aria-selected="true">
+            <svg class="icon"><use href="#i-spark"/></svg>Ask
+          </button>
+          <button role="tab" id="mode-form" aria-controls="view-form" aria-selected="false" tabindex="-1">
+            <svg class="icon"><use href="#i-form"/></svg>Fill a form
+          </button>
+        </div>
+      </header>
+
+      <!-- ================= Ask ================= -->
+      <section class="view view-ask" id="view-ask" role="tabpanel" aria-labelledby="mode-ask">
+        <div class="ask-scroll" id="ask-scroll">
+          <fieldset class="tasks">
+            <legend>What do you want to do?</legend>
+            <label class="task">
+              <input type="radio" name="task" value="assignment" checked>
+              <svg class="icon"><use href="#i-assignment"/></svg>
+              <span class="task-title">Create assignment</span>
+              <span class="task-desc">Due date, marks and files</span>
+            </label>
+            <label class="task">
+              <input type="radio" name="task" value="material">
+              <svg class="icon"><use href="#i-upload"/></svg>
+              <span class="task-title">Upload material</span>
+              <span class="task-desc">Slides or notes to a week</span>
+            </label>
+            <label class="task">
+              <input type="radio" name="task" value="course">
+              <svg class="icon"><use href="#i-course"/></svg>
+              <span class="task-title">Create course</span>
+              <span class="task-desc">A new course with weeks</span>
+            </label>
+          </fieldset>
+
+          <div class="course-pick" id="course-pick">
+            <label for="ask-course">Course</label>
+            <select id="ask-course"><option value="">Not chosen, I'll name it</option></select>
+            <span class="hint">LecAssist uses this course unless your request names another.</span>
+          </div>
+
+          <section class="hints" aria-labelledby="hints-title">
+            <h2 id="hints-title">Include in your request</h2>
+            <div class="hint-cols">
+              <div><h3>Required</h3><ul class="hint-list" id="hint-req"></ul></div>
+              <div><h3>Optional</h3><ul class="hint-list" id="hint-opt"></ul></div>
+            </div>
+            <div class="example">
+              <p class="example-label">Example</p>
+              <p class="example-text" id="example-text"></p>
+              <button type="button" class="btn btn-quiet" id="use-example">Use this example</button>
+            </div>
+          </section>
+
+          <ol class="thread" id="thread-assignment" data-task="assignment" role="log" aria-live="polite" aria-label="Create assignment conversation"></ol>
+          <ol class="thread" id="thread-material" data-task="material" role="log" aria-live="polite" aria-label="Upload material conversation" hidden></ol>
+          <ol class="thread" id="thread-course" data-task="course" role="log" aria-live="polite" aria-label="Create course conversation" hidden></ol>
+        </div>
+
+        <form class="composer" id="composer">
+          <label class="sr-only" for="prompt">Your request</label>
+          <div class="chips" id="chips" aria-label="Attached files"></div>
+          <div class="composer-row">
+            <label class="btn btn-icon" id="attach-label" title="Attach files">
+              <input type="file" id="attach" multiple class="sr-only">
+              <svg class="icon"><use href="#i-clip"/></svg><span class="sr-only">Attach files</span>
+            </label>
+            <textarea id="prompt" rows="1" placeholder="Create Lab 5 in AI101 week 5, due next Friday at 11:59 pm"></textarea>
+            <button class="btn btn-primary btn-icon" type="submit" id="send">
+              <svg class="icon"><use href="#i-send"/></svg><span class="sr-only">Send request</span>
+            </button>
+          </div>
+          <p class="composer-note">Nothing changes on eLearning until you approve it.</p>
+        </form>
+      </section>
+
+      <!-- ================= Fill a form ================= -->
+      <section class="view view-form" id="view-form" role="tabpanel" aria-labelledby="mode-form" hidden>
+        <div class="form-scroll">
+          <nav class="tabs" role="tablist" aria-label="Form">
+            <button role="tab" id="tab-assignment" aria-controls="panel-assignment" aria-selected="true">Create assignment</button>
+            <button role="tab" id="tab-material" aria-controls="panel-material" aria-selected="false" tabindex="-1">Upload material</button>
+            <button role="tab" id="tab-course" aria-controls="panel-course" aria-selected="false" tabindex="-1">Create course</button>
+          </nav>
+
+          <section role="tabpanel" id="panel-assignment" aria-labelledby="tab-assignment">
+            <form id="form-assignment" data-endpoint="/api/assignments" data-kind="assignment" novalidate>
+              <div class="card">
+                <h3>Where</h3>
+                <div class="row">
+                  <label>Course <span class="req" aria-hidden="true">*</span>
+                    <select name="course_id" class="course-select" required><option value="">Loading courses…</option></select>
+                  </label>
+                  <label>Week <span class="req" aria-hidden="true">*</span>
+                    <select name="section" class="week-select" required disabled><option value="">Choose a course first</option></select>
+                  </label>
+                </div>
+              </div>
+              <div class="card">
+                <h3>Assignment</h3>
+                <label>Title <span class="req" aria-hidden="true">*</span>
+                  <input name="name" required maxlength="255" placeholder="Lab 4: Search algorithms">
+                </label>
+                <label>Instructions for students
+                  <textarea name="description" rows="3" placeholder="Implement BFS and DFS and upload one PDF."></textarea>
+                </label>
+                <label class="check"><input type="checkbox" name="show_description"> Show instructions on the course page</label>
+                <label>Files for students <span class="hint">Question paper or template</span>
+                  <input type="file" name="attachments" multiple>
+                </label>
+              </div>
+              <div class="card">
+                <h3>Dates</h3>
+                <div class="row">
+                  <label>Due <span class="req" aria-hidden="true">*</span>
+                    <input type="datetime-local" name="due" required>
+                  </label>
+                  <label>Open from <span class="hint">Optional</span>
+                    <input type="datetime-local" name="allow_from">
+                  </label>
+                </div>
+                <label>Accept late work until <span class="hint">Optional</span>
+                  <input type="datetime-local" name="cutoff">
+                </label>
+              </div>
+              <div class="card">
+                <h3>Submissions and marks</h3>
+                <div class="row">
+                  <label class="check"><input type="checkbox" name="file_submissions" checked> Students upload files</label>
+                  <label class="check"><input type="checkbox" name="online_text"> Students type online text</label>
+                </div>
+                <div class="row">
+                  <label>Files per student
+                    <input type="number" name="max_files" value="1" min="1" max="20" required>
+                  </label>
+                  <label>Total marks
+                    <input type="number" name="max_grade" value="100" min="1" max="100" required>
+                  </label>
+                </div>
+              </div>
+              <div class="card">
+                <h3>Visibility</h3>
+                <label class="check"><input type="checkbox" name="visible" checked> Show to students</label>
+                <label class="check"><input type="checkbox" name="notify_students"> Notify students now</label>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Create assignment</button></div>
+            </form>
+          </section>
+
+          <section role="tabpanel" id="panel-material" aria-labelledby="tab-material" hidden>
+            <form id="form-material" data-endpoint="/api/materials" data-kind="material" novalidate>
+              <div class="card">
+                <h3>Where</h3>
+                <div class="row">
+                  <label>Course <span class="req" aria-hidden="true">*</span>
+                    <select name="course_id" class="course-select" required><option value="">Loading courses…</option></select>
+                  </label>
+                  <label>Week <span class="req" aria-hidden="true">*</span>
+                    <select name="section" class="week-select" required disabled><option value="">Choose a course first</option></select>
+                  </label>
+                </div>
+              </div>
+              <div class="card">
+                <h3>Material</h3>
+                <label>Title students see <span class="req" aria-hidden="true">*</span>
+                  <input name="name" required maxlength="255" placeholder="Week 4 slides">
+                </label>
+                <label>Files <span class="req" aria-hidden="true">*</span>
+                  <input type="file" name="files" multiple required>
+                </label>
+                <label>Note for students
+                  <textarea name="description" rows="2" placeholder="Read before Thursday's class."></textarea>
+                </label>
+                <label class="check"><input type="checkbox" name="show_description"> Show the note on the course page</label>
+              </div>
+              <div class="card">
+                <h3>Visibility</h3>
+                <label class="check"><input type="checkbox" name="visible" checked> Show to students</label>
+                <label class="check"><input type="checkbox" name="notify_students"> Notify students now</label>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Upload material</button></div>
+            </form>
+          </section>
+
+          <section role="tabpanel" id="panel-course" aria-labelledby="tab-course" hidden>
+            <form id="form-course" data-endpoint="/api/courses" data-kind="course" novalidate>
+              <div class="card">
+                <h3>Course</h3>
+                <label>Full name <span class="req" aria-hidden="true">*</span>
+                  <input name="fullname" required maxlength="254" placeholder="Data Mining (Section A)">
+                </label>
+                <div class="row">
+                  <label>Short name <span class="req" aria-hidden="true">*</span>
+                    <input name="shortname" required maxlength="100" placeholder="DM401-A">
+                    <span class="hint">Must be unique on the portal</span>
+                  </label>
+                  <label>Category <span class="req" aria-hidden="true">*</span>
+                    <select name="category_id" id="category-select" required><option value="">Loading categories…</option></select>
+                  </label>
+                </div>
+                <label>Description
+                  <textarea name="summary" rows="2" placeholder="Data preprocessing, clustering and classification."></textarea>
+                </label>
+              </div>
+              <div class="card">
+                <h3>Schedule</h3>
+                <div class="row">
+                  <label>Starts <span class="req" aria-hidden="true">*</span>
+                    <input type="date" name="start" required>
+                  </label>
+                  <label>Ends <span class="hint">Optional</span>
+                    <input type="date" name="end">
+                  </label>
+                </div>
+                <label>Weeks
+                  <input type="number" name="weeks" value="14" min="1" max="52" required>
+                </label>
+              </div>
+              <div class="card">
+                <h3>Visibility</h3>
+                <label class="check"><input type="checkbox" name="visible" checked> Show to students</label>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Create course</button></div>
+            </form>
+          </section>
+
+          <div id="form-result" class="notice" role="status" hidden></div>
+        </div>
+      </section>
+
+      <!-- ================= Coming soon ================= -->
+      <section class="view view-soon" id="view-soon" hidden aria-labelledby="soon-title">
+        <div class="soon-card">
+          <svg class="icon soon-icon" id="soon-icon"><use href="#i-mic"/></svg>
+          <p class="badge">Coming soon</p>
+          <h2 id="soon-title"></h2>
+          <p id="soon-text"></p>
+          <ul id="soon-list"></ul>
+          <button type="button" class="btn" id="soon-back">Back to eLearning</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title">Create this on eLearning?</h2>
+      <dl class="rows" id="confirm-list"></dl>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">Go back</button>
+        <button value="ok" class="btn btn-primary" id="confirm-ok">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
