@@ -196,3 +196,25 @@ def add_material(page, course_id: int, section: int, name: str, files: list[str]
     set_checkbox(page, "id_coursecontentnotification", notify_students)
     save_form(page, "id_submitbutton2", "modedit.php")
     return find_module(course_id, section, name) or {}
+
+
+def save_gradebook_marks(page, course_id: int, item_id: int, marks: list[dict]):
+    """Type marks into the gradebook's Single view for one item (used for quizzes,
+    whose marks cannot be saved through the API). marks: [{"student", "mark"}]."""
+    url = f"{URL}/grade/report/singleview/index.php?id={course_id}&item=grade&itemid={item_id}"
+    page.goto(url)
+    switch = page.locator("input[name=setmode]")
+    if switch.count() and not switch.is_checked():
+        with page.expect_navigation():
+            switch.click()
+        page.goto(url)
+    for m in marks:
+        box = page.locator(f"#finalgrade_{item_id}_{m['student']}")
+        if box.count() == 0:
+            continue
+        override = page.locator(f"input[name=override_{item_id}_{m['student']}]")
+        if override.count() and not override.is_checked():
+            override.check()
+        box.fill(f"{m['mark']:g}")
+    page.locator("input[type=submit][value=Save]").first.click()
+    page.wait_for_load_state()

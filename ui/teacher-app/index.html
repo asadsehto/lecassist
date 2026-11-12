@@ -45,9 +45,11 @@
         <a class="nav-item" href="#elearning" data-page="elearning">
           <svg class="icon"><use href="#i-school"/></svg><span>eLearning</span>
         </a>
+        <a class="nav-item" href="#marks" data-page="marks">
+          <svg class="icon"><use href="#i-marks"/></svg><span>eLearning marks</span>
+        </a>
 
         <p class="nav-label">Coming next</p>
-        <button class="nav-item soon" type="button" data-soon="marks"><svg class="icon"><use href="#i-marks"/></svg><span>Marks</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="messages"><svg class="icon"><use href="#i-chat"/></svg><span>Telegram &amp; WhatsApp</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="search"><svg class="icon"><use href="#i-search"/></svg><span>Semester search</span><span class="badge">Soon</span></button>
         <button class="nav-item soon" type="button" data-soon="quizzes"><svg class="icon"><use href="#i-quiz"/></svg><span>Quizzes &amp; papers</span><span class="badge">Soon</span></button>
@@ -115,6 +117,32 @@
             <p class="hint">After you stop, LecAssist writes an English transcript and a summary, then asks you to approve what eLearning needs, like the assignments you announced or uploading the slides.</p>
           </form>
           <div id="record-results" class="lecture-list"></div>
+        </div>
+      </section>
+
+      <!-- ================= Marks ================= -->
+      <section class="view" id="view-marks" hidden>
+        <div class="form-scroll">
+          <form class="card" id="marks-form" novalidate>
+            <div class="row">
+              <label>Course
+                <select name="course_id" id="marks-course"><option value="">Loading courses…</option></select>
+              </label>
+              <label>Assignment or quiz
+                <select name="item_id" id="marks-assignment" disabled><option value="">Choose a course first</option></select>
+              </label>
+            </div>
+            <label>Or type which one
+              <input name="text" id="marks-text" placeholder="Quiz 1 of AI101">
+              <span class="hint">Use this when you don't pick from the lists. Include the course code if no course is chosen.</span>
+            </label>
+            <label>Excel sheet <span class="req" aria-hidden="true">*</span>
+              <input type="file" name="sheet" id="marks-sheet" accept=".xlsx,.csv" required>
+              <span class="hint">Columns: Name, CMS and Marks. If the sheet has an Email column, students are matched by email.</span>
+            </label>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" id="marks-check">Check sheet</button></div>
+          </form>
+          <div id="marks-preview"></div>
         </div>
       </section>
 

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from lecassist import moodle_actions as moodle
 from lecassist import moodle_tools
+from lecassist import marks
 from lecassist.playground import Elearning_Agent, Summary_Agent
 
 app = FastAPI(title="LecAssist eLearning API")
@@ -440,6 +441,81 @@ def get_lecture(lecture_id: str):
     if lecture is None:
         raise HTTPException(404, "No such lecture")
     return lecture_view(lecture)
+
+
+# ---------- eLearning marks ----------
+
+@app.get("/api/courses/{course_id}/items")
+def get_items(course_id: int):
+    """Every assignment and quiz of a course."""
+    return marks.course_items(course_id)
+
+
+@app.post("/api/marks/check")
+def check_marks(sheet: UploadFile = File(...), course_id: int | None = Form(None), item_key: str = Form(""),
+                text: str = Form("")):
+    """Read the sheet and match each row to a student. Nothing is saved.
+    The assignment or quiz comes from the dropdowns, or else from `text` ("Quiz 1 of AI101")."""
+    if not item_key:
+        if not text.strip():
+            raise HTTPException(400, "Choose the assignment or quiz, or type which one it is.")
+        course_id, item, problem = marks.find_course_and_item(text, moodle.list_courses(), course_id)
+        if item is None:
+            raise HTTPException(400, problem)
+    else:
+        item = next((i for i in marks.course_items(course_id or 0) if i["key"] == item_key), None)
+        if item is None:
+            raise HTTPException(400, "Choose an assignment or quiz of this course")
+    if item["max"] <= 0:
+        raise HTTPException(400, f"“{item['name']}” is not marked with points on eLearning, so marks cannot be uploaded to it.")
+    try:
+        rows = marks.read_sheet(sheet.filename or "", sheet.file.read())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, "Could not read the file. Save it as .xlsx or .csv and try again.")
+    if not rows:
+        raise HTTPException(400, "The sheet has no student rows.")
+    students = marks.course_students(course_id)
+    course = next((c for c in moodle.list_courses() if c["id"] == course_id), {"shortname": ""})
+    if not students:
+        raise HTTPException(400, f"No students are enrolled in {course['shortname']} on eLearning, so there is no one to give marks to.")
+    return {"course_id": course_id, "course": course["shortname"], "item": item, "students": students,
+            "rows": marks.match_rows(rows, students, item["max"])}
+
+
+class MarkIn(BaseModel):
+    student: int
+    mark: float
+    cms: str = ""
+
+
+class SaveMarksIn(BaseModel):
+    course_id: int
+    item_key: str
+    marks: list[MarkIn]
+
+
+@app.post("/api/marks/save")
+def save_marks(body: SaveMarksIn):
+    """Save the approved marks, then report what eLearning really stored."""
+    item = next((i for i in marks.course_items(body.course_id) if i["key"] == body.item_key), None)
+    if item is None:
+        raise HTTPException(400, "Choose an assignment or quiz of this course")
+    students = marks.course_students(body.course_id)
+    enrolled = {s["id"] for s in students}
+    for m in body.marks:
+        if m.student not in enrolled:
+            raise HTTPException(400, f"Student {m.student} is not in this course")
+        if not 0 <= m.mark <= item["max"]:
+            raise HTTPException(400, f"Marks must be between 0 and {item['max']:g}")
+    rows = [m.model_dump() for m in body.marks]
+    if item["kind"] == "quiz":
+        with browser_lock, moodle.moodle_page() as page:
+            results = marks.save_marks(body.course_id, item, rows, students, page)
+    else:
+        results = marks.save_marks(body.course_id, item, rows, students)
+    return {"saved": sum(r["saved"] for r in results), "results": results}
 
 
 # The simple teacher forms. A different UI can ignore this and call /api directly.

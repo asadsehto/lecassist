@@ -77,8 +77,6 @@ const selectFormTab = tabList($$(".tabs [role=tab]"), tab => {
 
 // ---------- sidebar ----------
 const SOON = {
-  marks: ["marks", "Marks", "Give LecAssist your marks sheet and it enters the marks into the LMS for you, after you approve.",
-    ["Upload from an Excel sheet", "Check every row before it is submitted"]],
   messages: ["chat", "Telegram & WhatsApp", "Get summaries on your phone and give instructions like this app does, from a chat.",
     ["Summaries sent to the class group", "Approve actions with a Yes or No button"]],
   search: ["search", "Semester search", "Ask a question and get the answer from all your lectures, with the lecture and date it came from.",
@@ -89,10 +87,11 @@ const SOON = {
 const PAGES = {
   record: ["Record lecture", "Record or upload a lecture. LecAssist writes the summary and finds what eLearning needs."],
   elearning: ["eLearning", "Approve what your lectures need, ask for a task, or fill a form."],
+  marks: ["eLearning marks", "Upload an Excel sheet of marks to an assignment or quiz on eLearning."],
 };
 const navItems = $$(".nav-item");
 function showView(id) {
-  ["view-record", "view-lectures", "view-ask", "view-form", "view-soon"].forEach(v => { $("#" + v).hidden = v !== id; });
+  ["view-record", "view-marks", "view-lectures", "view-ask", "view-form", "view-soon"].forEach(v => { $("#" + v).hidden = v !== id; });
   $(".segmented").hidden = !["view-lectures", "view-ask", "view-form"].includes(id);
 }
 function openPage(name) {
@@ -102,6 +101,7 @@ function openPage(name) {
     $(".page-head .sub").textContent = PAGES[name][1];
   }
   if (name === "record") showView("view-record");
+  if (name === "marks") showView("view-marks");
   if (name === "elearning") {
     const tab = $(".segmented [aria-selected=true]");
     showView($("#" + tab.getAttribute("aria-controls")).id);
@@ -601,6 +601,145 @@ async function loadLectures() {
   }
 }
 
+// ---------- Marks ----------
+let marksCheck = null;   // the last checked sheet: {assignment, students, rows}
+
+$("#marks-course").addEventListener("change", async () => {
+  const sel = $("#marks-assignment");
+  sel.disabled = true;
+  $("#marks-preview").replaceChildren();
+  if (!$("#marks-course").value) { sel.replaceChildren(option("", "Choose a course first")); return; }
+  sel.replaceChildren(option("", "Loading…"));
+  try {
+    const list = await api(`/api/courses/${$("#marks-course").value}/items`);
+    const group = (label, kind) => {
+      const items = list.filter(i => i.kind === kind);
+      return items.length ? [el("optgroup", { label }, ...items.map(i => option(i.key, `${i.name} · ${i.week}` + (i.max > 0 ? ` (out of ${i.max})` : ""))))] : [];
+    };
+    sel.replaceChildren(option("", list.length ? "Choose, or type below" : "No assignments or quizzes in this course"),
+      ...group("Assignments", "assignment"), ...group("Quizzes", "quiz"));
+    sel.disabled = !list.length;
+  } catch (err) {
+    sel.replaceChildren(option("", "Unable to load: " + err.message));
+  }
+});
+
+$("#marks-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.target;
+  if (!validate(form)) return;
+  if (!$("#marks-assignment").value && !$("#marks-text").value.trim()) {
+    setError($("#marks-text"), "Choose the assignment or quiz above, or type which one it is.");
+    $("#marks-text").focus();
+    return;
+  }
+  const button = $("#marks-check");
+  button.disabled = true;
+  button.textContent = "Checking…";
+  try {
+    const data = new FormData();
+    data.append("sheet", $("#marks-sheet").files[0]);
+    if ($("#marks-course").value) data.append("course_id", $("#marks-course").value);
+    if ($("#marks-assignment").value) data.append("item_key", $("#marks-assignment").value);
+    data.append("text", $("#marks-text").value);
+    marksCheck = await api("/api/marks/check", { method: "POST", body: data });
+    renderMarks();
+  } catch (err) {
+    $("#marks-preview").replaceChildren(el("div", { class: "notice err" }, icon("alert"), "Not checked: " + err.message));
+  } finally {
+    button.disabled = false;
+    button.textContent = "Check sheet";
+  }
+});
+
+function markOk(r) {
+  return r.mark !== null && r.mark >= 0 && r.mark <= marksCheck.item.max;
+}
+
+function marksStatus() {
+  const rows = marksCheck.rows;
+  const counts = {};
+  rows.forEach(r => { if (r.student !== null && markOk(r)) counts[r.student] = (counts[r.student] || 0) + 1; });
+  rows.forEach(r => {
+    if (r.result) return;
+    r.ready = r.student !== null && markOk(r) && counts[r.student] === 1;
+    r.note = r.student === null ? (r.choices.length ? "Choose which student this is." : "Choose the student or leave it skipped.")
+      : !markOk(r) ? `Mark must be a number from 0 to ${marksCheck.item.max}.`
+      : counts[r.student] > 1 ? "This student is chosen on more than one row." : "";
+  });
+  return rows.filter(r => r.ready).length;
+}
+
+function renderMarks() {
+  const { item, students, rows } = marksCheck;
+  const ready = marksStatus();
+  const byId = Object.fromEntries(students.map(s => [s.id, s]));
+  const body = el("tbody");
+  rows.forEach(r => {
+    const pick = el("select", { "aria-label": `Student for sheet row ${r.row}` },
+      option("", "Skip this row"),
+      ...(r.choices.length ? r.choices.map(id => byId[id]) : students).map(s => option(s.id, `${s.name} · ${s.email}`)));
+    pick.value = r.student ?? "";
+    pick.disabled = !!r.result;
+    pick.addEventListener("change", () => { r.student = pick.value ? Number(pick.value) : null; renderMarks(); });
+    const status = r.result
+      ? (r.result.saved ? el("span", { class: "tag-ok" }, icon("check"), "Saved") : el("span", { class: "tag-err" }, icon("alert"), r.result.error))
+      : r.ready ? el("span", { class: "tag-ok" }, icon("check"), r.how ? "Matched by " + r.how : "Ready")
+      : el("span", { class: "tag-err" }, icon("alert"), r.note);
+    body.append(el("tr", { class: r.ready || r.result?.saved ? "" : "needs" },
+      el("td", { class: "num" }, String(r.row)), el("td", {}, r.name || "—"), el("td", { class: "num" }, r.cms || "—"),
+      el("td", { class: "num" }, r.marks || "—"), el("td", {}, pick), el("td", {}, status)));
+  });
+  const table = el("div", { class: "table-wrap" }, el("table", { class: "marks" },
+    el("thead", {}, el("tr", {}, ...["Row", "Name in sheet", "CMS", "Mark", "Student on eLearning", "Status"].map(t => el("th", { scope: "col" }, t)))),
+    body));
+  const saved = rows.filter(r => r.result?.saved).length;
+  const upload = el("button", { type: "button", class: "btn btn-primary" }, `Upload ${ready} mark${ready === 1 ? "" : "s"}`);
+  upload.disabled = ready === 0;
+  upload.addEventListener("click", () => uploadMarks(upload));
+  $("#marks-preview").replaceChildren(
+    el("div", { class: "marks-head" },
+      el("p", {}, el("strong", {}, item.name), ` · ${item.kind} · ${marksCheck.course} · out of ${item.max} · `,
+        `${ready} ready, ${rows.length - ready - saved} need attention` + (saved ? `, ${saved} saved` : "")),
+      upload),
+    table,
+    el("p", { class: "hint" }, "Rows that need attention are not uploaded. Pick the student, or leave them skipped and enter those marks on eLearning."));
+}
+
+async function uploadMarks(button) {
+  const rows = marksCheck.rows.filter(r => r.ready && !r.result);
+  const dialog = $("#confirm");
+  $("#confirm-title").textContent = `Upload ${rows.length} marks to “${marksCheck.item.name}”?`;
+  $("#confirm-ok").textContent = "Upload marks";
+  $("#confirm-list").replaceChildren(el("dt", {}, "Course"), el("dd", {}, marksCheck.course),
+    el("dt", {}, "Students"), el("dd", {}, String(rows.length)),
+    el("dt", {}, "Existing marks"), el("dd", {}, "Replaced for these students"));
+  const ok = await new Promise(resolve => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true });
+    dialog.returnValue = "";  // Esc or closing must never reuse an earlier "ok"
+    dialog.showModal();
+  });
+  if (!ok) return;
+  button.disabled = true;
+  button.textContent = "Uploading…";
+  try {
+    const res = await api("/api/marks/save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ course_id: marksCheck.course_id, item_key: marksCheck.item.key,
+        marks: rows.map(r => ({ student: r.student, mark: r.mark, cms: r.cms })) }),
+    });
+    res.results.forEach(result => {
+      const r = rows.find(x => x.student === result.student);
+      if (r) { r.result = result; r.ready = false; }
+    });
+    renderMarks();
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = "Try again";
+    $("#marks-preview").prepend(el("div", { class: "notice err" }, icon("alert"), "Not uploaded: " + err.message));
+  }
+}
+
 // ---------- dropdowns ----------
 async function loadCourses() {
   const selects = $$(".course-select");
@@ -612,6 +751,11 @@ async function loadCourses() {
         ...courses.map(c => option(c.id, `${c.shortname} · ${c.fullname}`)));
       sel.value = keep;
     });
+    const marksCourse = $("#marks-course");
+    const keepMarks = marksCourse.value;
+    marksCourse.replaceChildren(option("", "Choose a course"),
+      ...courses.map(c => option(c.id, `${c.shortname} · ${c.fullname}`)));
+    marksCourse.value = keepMarks;
     const pick = $("#ask-course");
     const picked = pick.value;
     pick.replaceChildren(option("", "Not chosen, I'll name it"),
@@ -714,6 +858,7 @@ function confirmWith(kind, rows) {
   $("#confirm-list").replaceChildren(...rows.filter(([, v]) => v).flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)]));
   return new Promise(resolve => {
     dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true });
+    dialog.returnValue = "";  // Esc or closing must never reuse an earlier "ok"
     dialog.showModal();
     $("#confirm-ok").focus();
   });
@@ -776,4 +921,6 @@ showHints();
 setToday();
 loadCourses();
 loadStatus();
-openPage(location.hash === "#elearning" ? "elearning" : "record");
+const pageFromHash = () => openPage(["#elearning", "#marks"].includes(location.hash) ? location.hash.slice(1) : "record");
+window.addEventListener("hashchange", pageFromHash);
+pageFromHash();

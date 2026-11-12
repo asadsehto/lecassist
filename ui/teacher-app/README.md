@@ -7,7 +7,8 @@ The LecAssist teacher app. Sidebar:
   - **From lectures**: every recorded lecture with its summary (Edit summary reruns the check), transcript, the actions waiting for approval (Approve, Change, Decline) and a reply box to answer LecAssist or attach slides.
   - **Ask**: pick a task (create assignment, upload material, create course), optionally choose the course, type the request and approve what the agent wants to do. Each task keeps its own chat.
   - **Fill a form**: the same three tasks with every field.
-- **Coming next**: marks, Telegram and WhatsApp, semester search, quizzes ("Coming soon" pages).
+- **eLearning marks**: choose the course and the assignment or quiz (or type which one, like "Quiz 1 of AI101"), upload an Excel (.xlsx) or .csv sheet with Name, CMS and Marks (Email optional). Each row is matched to a student: by email, then by a CMS matched before, then by name. Same-name or unknown students are never guessed; the teacher picks them. Marks outside 0 to the maximum are not sent. Assignment marks are saved through the API; quiz marks are typed into the gradebook's Single view by the browser, because Moodle has no API for them. After upload, LecAssist reads the marks back from eLearning to confirm each one.
+- **Coming next**: Telegram and WhatsApp, semester search, quizzes ("Coming soon" pages).
 
 ## Where the code is
 
@@ -19,6 +20,8 @@ src/lecassist/playground/Summary_Agent.py     lecture summary, then the eLearnin
 src/lecassist/moodle_tools.py              the tools both agents call (add_assignment, add_material, add_course)
 src/lecassist/audio/translate.py           English transcript with faster-whisper (from Aura)
 src/lecassist/moodle_actions.py            all-fields Moodle forms, used by Fill a form only
+src/lecassist/marks.py                     Excel marks: read, match students, save and confirm
+src/lecassist/check_moodle.py              one-command check that a site and account work with LecAssist
 ```
 
 The agents never act on their own: every tool in `moodle_tools.py` calls `approve()`. In the terminal that is `input()`; in the app, `server/app.py` replaces it so the question shows with Approve and Decline buttons.
@@ -58,6 +61,9 @@ An agent runs as a **job**. Poll `GET /api/jobs/{id}`:
 | POST | `/api/lectures/{id}/reply` | JSON `{"text", "file_ids"}` | answer the agent or ask for a change; files are added to the lecture |
 | POST | `/api/lectures/{id}/summary` | JSON `{"summary"}` | save an edited summary; the agent checks it again from the start |
 | POST | `/api/agent/ask` | JSON `{"messages": [{"role", "content"}], "task": "assignment", "course_id": 14, "file_ids": []}` | Elearning_Agent; returns the job |
+| GET | `/api/courses/{id}/items` | | assignments and quizzes: `[{"id", "kind", "instance", "name", "max"}]` |
+| POST | `/api/marks/check` | multipart `sheet`, and `course_id` + `item_id` or `text` ("Quiz 1 of AI101") | matches rows; saves nothing |
+| POST | `/api/marks/save` | JSON `{"course_id", "item_id", "marks": [{"student", "mark", "cms"}]}` | saves and reads back each mark |
 | GET | `/api/status` | | `{"moodle", "model", "model_ok"}` |
 | GET | `/api/courses`, `/api/courses/{id}/weeks`, `/api/categories` | | lists for dropdowns |
 | POST | `/api/courses` (JSON), `/api/assignments`, `/api/materials` (multipart) | | Fill a form, all fields |

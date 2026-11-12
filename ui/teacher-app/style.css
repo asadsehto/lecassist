@@ -395,6 +395,22 @@ label > .hint:last-child { display: block; margin-top: 4px; }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; text-align: center; }
 .empty-title { font-weight: 600; font-size: 0.9375rem; }
 
+/* ---------- marks ---------- */
+#view-marks .form-scroll > * { max-width: 1000px; }
+.marks-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 8px 0 12px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-surface); }
+table.marks { width: 100%; border-collapse: collapse; }
+.marks th, .marks td { padding: 8px 12px; text-align: start; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.marks th { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-text-secondary); white-space: nowrap; }
+.marks tr:last-child td { border-bottom: 0; }
+.marks .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.marks select { width: 100%; min-width: 220px; padding: 6px 8px; border: 1px solid var(--color-border-input); border-radius: 6px; background: var(--color-bg-surface); }
+.marks tr.needs td:first-child { box-shadow: inset 3px 0 0 var(--color-danger-text); }
+.tag-ok, .tag-err { display: inline-flex; align-items: center; gap: 6px; }
+.tag-ok { color: var(--color-success-text); }
+.tag-err { color: var(--color-danger-text); }
+.tag-ok .icon, .tag-err .icon { width: 16px; height: 16px; flex: none; }
+
 /* ---------- coming soon ---------- */
 .view-soon { align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
 .soon-card { max-width: 460px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
