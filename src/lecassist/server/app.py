@@ -106,6 +106,7 @@ class CourseIn(BaseModel):
     weeks: int = Field(14, ge=1, le=52)
     summary: str = ""
     visible: bool = True
+    enrolment_key: str = Field("", max_length=50)
 
 
 @app.post("/api/courses")
@@ -114,8 +115,11 @@ def create_course(course: CourseIn):
         raise HTTPException(400, "End date must be after the start date")
     result = run_in_moodle(moodle.create_course, course.fullname.strip(), course.shortname.strip(),
                            course.category_id, course.start, course.end, course.weeks,
-                           course.summary, course.visible)
-    return {"message": f"Course '{course.fullname}' created", **result}
+                           course.summary, course.visible, course.enrolment_key.strip())
+    message = f"Course '{course.fullname}' created"
+    if result["enrolment_key"]:
+        message += f". Students can join with the enrolment key {result['enrolment_key']}"
+    return {"message": message, **result}
 
 
 @app.post("/api/assignments")

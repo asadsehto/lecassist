@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from lecassist.browser import login, create_assignment, upload_material, create_course, attach_file
 from lecassist.Moodle import call_moodle, find_course , find_week
+from lecassist.moodle_actions import set_enrolment_key
 username = os.environ["MOODLE_USER"]
 password = os.environ["MOODLE_PASS"]
 URL      = os.environ["URL"]
@@ -40,26 +41,36 @@ def add_assignment(course: str, week: int, name: str, due: str, pdf_path: str = 
         return {"error": str(e)}
     return {"done": "assignment created", "course": c["shortname"], "week": week, "name": name, "due": due}
 
-def add_course(fullname: str, shortname: str, weeks: int = 14) -> dict:
+def add_course(fullname: str, shortname: str, weeks: int = 14, enrolment_key: str = "") -> dict:
     """Create a new Moodle course.
 
     Args:
         fullname: full course name, for example Machine Learning Lab
         shortname: unique short name, for example ML301
         weeks: number of weeks, 14 if not given
+        enrolment_key: key students type to join the course, or empty for none
     """
-    if not approve("create course '" + fullname + "' (" + shortname + ") with " + str(weeks) + " weeks"):
+    action = "create course '" + fullname + "' (" + shortname + ") with " + str(weeks) + " weeks"
+    if enrolment_key:
+        action = action + ", enrolment key " + enrolment_key
+    if not approve(action):
         return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
+            browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             login(page, username, password)
             create_course(page, fullname, shortname, weeks)
+            if enrolment_key:
+                course_id = int(page.url.split("id=")[1].split("&")[0].split("#")[0])
+                set_enrolment_key(page, course_id, enrolment_key)
             browser.close()
     except Exception as e:
         return {"error": str(e)}
-    return {"done": "course created", "fullname": fullname, "shortname": shortname}
+    result = {"done": "course created", "fullname": fullname, "shortname": shortname}
+    if enrolment_key:
+        result["enrolment_key"] = enrolment_key
+    return result
 
 def add_material(course: str, week: int, name: str, file_path: str) -> dict:
     """Upload a file as course material under a given week of a Moodle course.
@@ -80,7 +91,7 @@ def add_material(course: str, week: int, name: str, file_path: str) -> dict:
         return {"cancelled": "the teacher did not approve this"}
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
+            browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             login(page, username, password)
             upload_material(page, c["id"], w["section"], name, file_path)

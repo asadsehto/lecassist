@@ -138,7 +138,7 @@ def list_categories(page) -> list[dict]:
 
 def create_course(page, fullname: str, shortname: str, category_id: int,
                   start: datetime, end: datetime | None = None, weeks: int = 14,
-                  summary: str = "", visible: bool = True) -> dict:
+                  summary: str = "", visible: bool = True, enrolment_key: str = "") -> dict:
     page.goto(f"{URL}/course/edit.php?category={category_id}")
     page.locator("#id_fullname").fill(fullname)
     page.locator("#id_shortname").fill(shortname)
@@ -150,7 +150,30 @@ def create_course(page, fullname: str, shortname: str, category_id: int,
     page.locator("#id_numsections").select_option(str(weeks))
     save_form(page, "id_saveanddisplay", "course/edit.php")
     course_id = int(page.url.split("id=")[1].split("&")[0].split("#")[0])
-    return {"id": course_id, "url": f"{URL}/course/view.php?id={course_id}"}
+    if enrolment_key:
+        set_enrolment_key(page, course_id, enrolment_key)
+    return {"id": course_id, "url": f"{URL}/course/view.php?id={course_id}",
+            "enrolment_key": enrolment_key}
+
+
+def set_enrolment_key(page, course_id: int, key: str):
+    """Turn on self enrolment for a course with this key, so students can join with it.
+
+    Same form a teacher uses: Participants > Enrolment methods > Self enrolment.
+    """
+    page.goto(f"{URL}/enrol/instances.php?id={course_id}")
+    edit = page.locator("a[href*='enrol/editinstance.php'][href*='type=self']")
+    if edit.count():
+        page.goto(edit.first.get_attribute("href"))
+    else:  # no self enrolment method on this course yet, so add one
+        page.goto(f"{URL}/enrol/editinstance.php?type=self&courseid={course_id}")
+    page.locator("#id_status").select_option("0")       # allow existing enrolments: Yes
+    page.locator("#id_customint6").select_option("1")   # allow new enrolments: Yes
+    unmask = page.locator("[data-passwordunmask='edit']").first
+    if unmask.count() and unmask.is_visible():
+        unmask.click()
+    page.locator("#id_password").fill(key)
+    save_form(page, "id_submitbutton", "enrol/editinstance.php")
 
 
 def create_assignment(page, course_id: int, section: int, name: str, due: datetime,

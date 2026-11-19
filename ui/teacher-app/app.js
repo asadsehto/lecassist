@@ -843,7 +843,7 @@ function summary(form) {
   const e = form.elements;
   if (form.dataset.kind === "course") return [["Full name", e.fullname.value], ["Short name", e.shortname.value],
     ["Category", shown(e.category_id)], ["Starts", day(e.start.value)], ["Ends", day(e.end.value)],
-    ["Weeks", e.weeks.value], ["Shown to students", yes(e.visible)]];
+    ["Weeks", e.weeks.value], ["Shown to students", yes(e.visible)], ["Enrolment key", e.enrolment_key.value.trim()]];
   const where = [["Course", shown(e.course_id)], ["Week", shown(e.section)]];
   if (form.dataset.kind === "assignment") return [...where, ["Title", e.name.value], ["Due", when(e.due.value)],
     ["Opens", when(e.allow_from.value)], ["Late work until", when(e.cutoff.value)], ["Marks", e.max_grade.value],
@@ -873,6 +873,7 @@ function buildRequest(form) {
         fullname: e.fullname.value, shortname: e.shortname.value, category_id: Number(e.category_id.value),
         start: e.start.value + "T00:00", end: e.end.value ? e.end.value + "T00:00" : null,
         weeks: Number(e.weeks.value), summary: e.summary.value, visible: e.visible.checked,
+        enrolment_key: e.enrolment_key.value.trim(),
       }),
     };
   }
